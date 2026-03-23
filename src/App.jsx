@@ -13,7 +13,6 @@ const App = () => {
   const [currentPage, setCurrentPage] = useState('dashboard'); 
   const [collapsed, setCollapsed] = useState(false);
 
-  // Фиксируем темную тему
   const currentTheme = customColors.dark;
 
   const renderContent = () => {
@@ -23,7 +22,6 @@ const App = () => {
       case 'profile':
         return <Profile setIsLoggedIn={setIsLoggedIn} />;
       case 'friends':
-        // Теперь здесь будет контент для друзей
         return <div style={{ color: '#fff' }}>Список друзей скоро будет здесь!</div>;
       default:
         return <Dashboard currentTheme={currentTheme} />;
@@ -46,7 +44,6 @@ const App = () => {
           setCollapsed={setCollapsed}
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
-          // Убираем пропсы для переключения темы
         />
         <Layout style={{ background: '#000' }}>
           <Content style={{ padding: '40px' }}>

@@ -21,7 +21,7 @@ const Sidebar = ({ collapsed, setCollapsed, currentPage, setCurrentPage }) => {
         {collapsed ? 'OM' : 'OFFICE MANAGER'}
       </div>
       <Menu
-        theme="dark" // Всегда темная
+        theme="dark" 
         selectedKeys={[currentPage]}
         mode="inline"
         onClick={(e) => setCurrentPage(e.key)}

@@ -4,7 +4,6 @@ import { Table, Typography, Tag, Button, Space } from 'antd';
 const { Title, Text } = Typography;
 
 const Dashboard = ({ currentTheme }) => {
-  // Безопасные цвета
   const textColor = currentTheme?.colors?.text || '#ffffff';
 
   const dataSource = [

@@ -5,7 +5,6 @@ import { LockOutlined, MailOutlined } from '@ant-design/icons';
 const { Title, Text } = Typography;
 
 const Login = ({ onLogin, currentTheme }) => {
-  // Если вдруг currentTheme не пришла, приложение не упадет, а возьмет дефолты
   const colors = currentTheme?.colors || { bg: '#141414', card: '#1f1f1f', border: '#333' };
 
   return (
@@ -15,7 +14,7 @@ const Login = ({ onLogin, currentTheme }) => {
       alignItems: 'center', 
       width: '100vw', 
       height: '100vh', 
-      background: colors.bg // Используем безопасную переменную
+      background: colors.bg 
     }}>
       <Card 
         title={<Title level={3} style={{ margin: 0, color: '#fadb14', textAlign: 'center' }}>Вход в OfficeManager</Title>} 
