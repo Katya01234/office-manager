@@ -1,7 +1,6 @@
 import { theme } from 'antd';
 
 export const themeConfig = {
-  // Общие настройки для обеих тем
   token: {
     colorPrimary: '#fadb14',    // Твой --primary-yellow
     colorError: '#ff1212',      // Твой --danger-red

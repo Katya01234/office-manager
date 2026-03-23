@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { Layout, ConfigProvider, theme } from 'antd';
 import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/Dashboard/index.jsx';
 import Profile from './pages/Profile'; 
+import Friends from './pages/Friends';
 import { themeConfig, customColors } from './styles/theme';
 
 const { Content } = Layout;
 
 const App = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false); 
+  const [isLoggedIn, setIsLoggedIn] = useState(true); 
   const [currentPage, setCurrentPage] = useState('dashboard'); 
   const [collapsed, setCollapsed] = useState(false);
 
@@ -22,7 +23,9 @@ const App = () => {
       case 'profile':
         return <Profile setIsLoggedIn={setIsLoggedIn} />;
       case 'friends':
-        return <div style={{ color: '#fff' }}>Список друзей скоро будет здесь!</div>;
+        return <Friends />;
+      case 'map':
+        return <div style={{ color: '#fff' }}>Карта офиса (в разработке)</div>;
       default:
         return <Dashboard currentTheme={currentTheme} />;
     }
