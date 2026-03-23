@@ -1,0 +1,61 @@
+import React, { useState } from 'react';
+import { Layout, ConfigProvider, theme } from 'antd';
+import Sidebar from './components/Sidebar';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Profile from './pages/Profile'; 
+import { themeConfig, customColors } from './styles/theme';
+
+const { Content } = Layout;
+
+const App = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false); 
+  const [currentPage, setCurrentPage] = useState('dashboard'); 
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Фиксируем темную тему
+  const currentTheme = customColors.dark;
+
+  const renderContent = () => {
+    switch (currentPage) {
+      case 'dashboard':
+        return <Dashboard currentTheme={currentTheme} />;
+      case 'profile':
+        return <Profile setIsLoggedIn={setIsLoggedIn} />;
+      case 'friends':
+        // Теперь здесь будет контент для друзей
+        return <div style={{ color: '#fff' }}>Список друзей скоро будет здесь!</div>;
+      default:
+        return <Dashboard currentTheme={currentTheme} />;
+    }
+  };
+
+  if (!isLoggedIn) {
+    return (
+      <ConfigProvider theme={{ ...themeConfig, algorithm: theme.darkAlgorithm }}>
+        <Login onLogin={() => setIsLoggedIn(true)} currentTheme={currentTheme} />
+      </ConfigProvider>
+    );
+  }
+
+  return (
+    <ConfigProvider theme={{ ...themeConfig, algorithm: theme.darkAlgorithm }}>
+      <Layout style={{ minHeight: '100vh', width: '100vw', background: '#000' }}>
+        <Sidebar 
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          // Убираем пропсы для переключения темы
+        />
+        <Layout style={{ background: '#000' }}>
+          <Content style={{ padding: '40px' }}>
+            {renderContent()}
+          </Content>
+        </Layout>
+      </Layout>
+    </ConfigProvider>
+  );
+};
+
+export default App;
