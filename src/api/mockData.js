@@ -1,57 +1,26 @@
-// Имитация данных пользователя (придет после /api/user/profile)
+// src/api/mockData.js
+import dayjs from 'dayjs';
+
+// Теперь поля называются как в Swagger: start_datetime, workspace_name и т.д. 
 export const mockUserStats = {
-  hasFixedPlace: false,
-  mainPlace: null, 
-  favoritePlace: "Б-202",
-  activeBooking: { 
-    place: "С-301", 
-    time: "23.03.2026, 14:00 - 18:00",
-    canCancel: true 
-  },
+  favoritePlace: "А-101",
   history: [
-    { key: 'h1', place: 'А-105', date: '20.03.2026', status: 'Завершено' },
-    { key: 'h2', place: 'Б-102', date: '18.03.2026', status: 'Отменено' },
+    { 
+      id: 1, 
+      workspace_name: 'А-101', 
+      start_datetime: dayjs().subtract(1, 'day').toISOString(), 
+      end_datetime: dayjs().subtract(1, 'day').add(2, 'hour').toISOString() 
+    }
   ]
 };
 
-// Имитация списка мест (придет после /api/places)
 export const mockPlaces = [
   { 
-    key: '1', 
-    name: 'Место А-101', 
-    status: 'Занято', 
-    isPermanent: true,
-    ownerName: 'Иван Иванов',
-    features: { 
-      monitors: 2,
-      window: true,
-      ac: false,
-      quietZone: true,
-      peripherals: 'Logitech Set' },  
+    id: 1, 
+    name: 'А-101', 
+    is_assigned: true, // Поле из Swagger 
+    description: 'Тихая зона у окна',
+    equipment: ["монитор", "Wi-Fi"] // Из Swagger 
   },
-  { 
-    key: '2', 
-    name: 'Место А-102', 
-    status: 'Занято', 
-    features: {
-      monitors: 1,
-      window: false,
-      ac: false,
-      quietZone: true,
-      peripherals: 'Logitech Set'
-    }, 
-  },
-  { 
-    key: '3', 
-    name: 'Место Б-202', 
-    status: 'Свободно', 
-    isFavorite: true,
-    features: {
-      monitors: 2,
-      window: true,
-      ac: true,
-      quietZone: false,
-      peripherals: 'Logitech Set'
-    }, 
-  },
+  { id: 2, name: 'Б-202', is_assigned: false, description: 'Open Space' }
 ];
