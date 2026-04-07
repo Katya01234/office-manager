@@ -1,38 +1,121 @@
-import BASE_URL, { getHeaders } from './api';
+import axios from 'axios';
 
-export const workspaceApi = {
-  // Авторизация
-  login: async (login, password) => {
-    const response = await fetch(`${BASE_URL}/auth/sign-in`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login, password })
-    });
-    if (!response.ok) throw new Error('Ошибка входа' + response.status);
-    return response.json(); // Вернет access_token и refresh_token 
-  },
+const API_URL = 'http://45.86.183.29:8080';
 
-  // Получить все места 
-  getWorkspaces: async () => {
-    const response = await fetch(`${BASE_URL}/workspaces`, { headers: getHeaders() });
-    if (!response.ok) throw new Error('Ошибка загрузки мест');
-    return response.json();
-  },
+// 1. Экземпляр axios
+const api = axios.create({
+  baseURL: API_URL,
+});
 
-  // Получить историю бронирований 
-  getBookingHistory: async () => {
-    const response = await fetch(`${BASE_URL}/bookings/history`, { headers: getHeaders() });
-    if (!response.ok) throw new Error('Ошибка загрузки истории');
-    return response.json();
-  },
-
-  // Добавить в избранное 
-  toggleFavorite: async (id) => {
-    const response = await fetch(`${BASE_URL}/workspaces/favourite`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify({ id })
-    });
-    return response.ok;
+// 2. Интерцептор ЗАПРОСОВ
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
+  return config;
+});
+
+// 3. Интерцептор ОТВЕТОВ
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const refreshToken = localStorage.getItem('refresh_token');
+        
+        // ВНИМАНИЕ: Убрал /api/v1, чтобы путь соответствовал baseURL
+        const res = await axios.post(`${API_URL}/auth/refresh`, {
+          refresh_token: refreshToken
+        });
+
+        if (res.data.access_token) {
+          localStorage.setItem('access_token', res.data.access_token);
+          localStorage.setItem('refresh_token', res.data.refresh_token);
+
+          originalRequest.headers.Authorization = `Bearer ${res.data.access_token}`;
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        localStorage.clear();
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// 4. Объект с методами
+export const workspaceApi = {
+  login: async (login, password) => {
+    const response = await api.post('/auth/sign-in', { login, password });
+    if (response.data.access_token) {
+      localStorage.setItem('access_token', response.data.access_token);
+      localStorage.setItem('refresh_token', response.data.refresh_token);
+    }
+    return response.data;
+  },
+
+  getWorkspaces: async () => {
+    const response = await api.get('/workspaces');
+    return response.data;
+  },
+
+  getMainWorkspace: async () => {
+    try {
+      const response = await api.get('/workspaces/main');
+      return response.data;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  getWorkspaceById: async (id) => {
+    const response = await api.get(`/workspaces/${id}`);
+    return response.data;
+  },
+
+  getBookings: async () => {
+    try {
+      const response = await api.get('/bookings');
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 404) return [];
+      throw error;
+    }
+  },
+
+  getBookingHistory: async () => {
+    const response = await api.get('/bookings/history');
+    return response.data;
+  },
+
+  createBooking: async (bookingData) => {
+    const response = await api.post('/bookings', bookingData);
+    return response.data;
+  },
+
+  getFavorite: async () => {
+    try {
+      const response = await api.get('/workspaces/favourite');
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 404) return null;
+      throw error;
+    }
+  },
+
+  toggleFavorite: async (workspaceId) => {
+    const response = await api.post('/workspaces/favourite', { 
+      id: Number(workspaceId) 
+    });
+    return response.data;
+  },
 };
+
+export default api;

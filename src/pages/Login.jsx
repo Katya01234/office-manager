@@ -1,34 +1,37 @@
 import React, { useState } from 'react';
 import { Card, Input, Button, Typography, message, Form } from 'antd';
-import { LockOutlined, UserOutlined } from '@ant-design/icons'; // Заменили Mail на User
+import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { workspaceApi } from "../api";
 
 const { Title, Text } = Typography;
 
 const Login = () => {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Нужно объявить внутри компонента
   const navigate = useNavigate();
 
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      // Вызываем метод из нашего api/index.js
-      // Обрати внимание: в форме поле называется 'login', чтобы совпадать со Swagger
+      // Вызываем метод из api
       const data = await workspaceApi.login(values.login, values.password);
+      
       // 1. Сохраняем токены
       localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
       
-      // Можно также сохранить имя пользователя, если оно есть в токене или ответе
-      localStorage.setItem('user_login', values.login);
-      message.success('Вход выполнен успешно!');
+      // 2. Сохраняем логин для отображения в Профиле
+      localStorage.setItem('user_login', values.login); 
       
-      // 2. Переходим в Dashboard
+      // Имя и роль (заглушки)
+      localStorage.setItem('user_name', data.name || 'Сотрудник'); 
+      localStorage.setItem('user_role', data.role || 'USER');
+
+      message.success('Вход выполнен успешно!');
       navigate('/dashboard');
     } catch (error) {
       console.error('Login error:', error.message);
-      message.error('Неверный логин или пароль', error.message);
+      message.error('Неверный логин или пароль');
     } finally {
       setLoading(false);
     }
@@ -41,7 +44,7 @@ const Login = () => {
       alignItems: 'center', 
       width: '100vw', 
       height: '100vh', 
-      background: '#000' // Сделал чистый черный для Old Money стиля
+      background: '#000' 
     }}>
       <Card 
         style={{ 
@@ -65,7 +68,6 @@ const Login = () => {
           layout="vertical"
           requiredMark={false}
         >
-          {/* Поле переименовано в login, так как этого ждет бекенд */}
           <Form.Item
             name="login"
             rules={[{ required: true, message: 'Введите логин!' }]}

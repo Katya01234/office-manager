@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Card, Space, Input, Button, Tag, Avatar, message, Spin } from 'antd';
-import { UserOutlined, EditOutlined, SaveOutlined, LogoutOutlined } from '@ant-design/icons';
+import { UserOutlined, EditOutlined, SaveOutlined, LogoutOutlined, TeamOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
+
+const ROLE_LABELS = {
+  'USER': 'Сотрудник',
+  'ADMIN': 'Администратор'
+};
 
 const Profile = () => {
   const [loading, setLoading] = useState(true);
@@ -11,99 +16,70 @@ const Profile = () => {
   const [userData, setUserData] = useState({
     name: '',
     role: 'USER',
-    email: ''
+    login: '',
+    team: '' // Новое поле для команды
   });
   
   const navigate = useNavigate();
-  const API_BASE = 'http://localhost:8080/api/v1';
 
-  // 1. Загрузка данных профиля при входе
   useEffect(() => {
-  const fetchProfile = async () => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/auth/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUserData({
-          name: data.full_name,
-          role: data.role,
-          email: data.email
-        });
-      } else {
-        // Если сервер ответил ошибкой (например, 404), используем заглушку
-        throw new Error('Server error');
+    const fetchProfile = async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        navigate('/login');
+        return;
       }
-    } catch (err) {
-      // ВМЕСТО handleLogout() ПИШЕМ ЭТО:
-      console.warn("Сервер не отвечает, использую тестовые данные профиля");
-      setUserData({
-        name: 'Тестовый Пользователь',
-        role: 'FRONTEND DEV',
-        email: 'test@office.com'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  fetchProfile();
-}, [navigate]);
-  // useEffect(() => {
-  //   const fetchProfile = async () => {
-  //     const token = localStorage.getItem('access_token');
-  //     if (!token) {
-  //       navigate('/login');
-  //       return;
-  //     }
+      try {
+        const response = await fetch('http://45.86.183.29:8080/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
 
-  //     try {
-  //       const response = await fetch(`${API_BASE}/auth/me`, {
-  //         headers: { 'Authorization': `Bearer ${token}` }
-  //       });
+        if (response.ok) {
+          const data = await response.json();
+          setUserData({
+            name: data.name || data.full_name || localStorage.getItem('user_name') || 'Не указано',
+            role: data.role || 'USER',
+            login: data.login || localStorage.getItem('user_login') || 'Не указан',
+            team: data.team || localStorage.getItem('user_team') || 'Без команды' // Загружаем команду
+          });
+        } else {
+          throw new Error('Ошибка сервера');
+        }
+      } catch (err) {
+        setUserData({
+          name: localStorage.getItem('user_name') || 'Не указано',
+          role: localStorage.getItem('user_role') || 'USER',
+          login: localStorage.getItem('user_login') || 'Не указан',
+          team: localStorage.getItem('user_team') || 'Без команды'
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  //       if (response.ok) {
-  //         const data = await response.json();
-  //         setUserData({
-  //           name: data.full_name || 'Пользователь',
-  //           role: data.role || 'USER',
-  //           email: data.email
-  //         });
-  //       } else {
-  //         throw new Error('Сессия истекла');
-  //       }
-  //     } catch (err) {
-  //       message.error('Ошибка авторизации');
-  //       handleLogout();
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
+    fetchProfile();
+  }, [navigate]);
 
-  //   fetchProfile();
-  // }, [navigate]);
-
-  // 2. Функция выхода (Очистка данных)
   const handleLogout = () => {
-  localStorage.removeItem('access_token'); 
-  window.location.href = '/login'; 
-};
+    localStorage.clear();
+    navigate('/login');
+  };
 
   const handleSave = async () => {
     setIsEditing(false);
+    localStorage.setItem('user_name', userData.name);
+    localStorage.setItem('user_team', userData.team); // Сохраняем команду локально
     message.success('Профиль успешно обновлен!');
-    console.log('Данные для отправки:', userData);
   };
 
-  if (loading) return <div style={{ textAlign: 'center', marginTop: 50 }}><Spin size="large" /></div>;
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', marginTop: 100 }}>
+        <Spin size="large" tip="Загрузка профиля..." />
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', padding: '24px' }}>
@@ -113,15 +89,35 @@ const Profile = () => {
         style={{ background: '#141414', borderColor: '#333', borderRadius: '16px' }}
         actions={[
           isEditing ? (
-            <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} style={{ background: '#fadb14', color: '#000', border: 'none' }}>Сохранить</Button>
+            <Button 
+              type="primary" 
+              icon={<SaveOutlined />} 
+              onClick={handleSave} 
+              style={{ background: '#fadb14', color: '#000', border: 'none' }}
+            >
+              Сохранить
+            </Button>
           ) : (
-            <Button ghost icon={<EditOutlined />} onClick={() => setIsEditing(true)} style={{ color: '#fadb14', borderColor: '#fadb14' }}>Редактировать</Button>
+            <Button 
+              ghost 
+              icon={<EditOutlined />} 
+              onClick={() => setIsEditing(true)} 
+              style={{ color: '#fadb14', borderColor: '#fadb14' }}
+            >
+              Редактировать
+            </Button>
           ),
           <Button danger icon={<LogoutOutlined />} onClick={handleLogout}>Выйти</Button>
         ]}
       >
-        <Space direction="vertical" size="large" style={{ width: '100%', textAlign: 'center' }}>
-          <Avatar size={100} icon={<UserOutlined />} style={{ backgroundColor: '#fadb14', color: '#000' }} />
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <div style={{ textAlign: 'center' }}>
+            <Avatar 
+              size={100} 
+              icon={<UserOutlined />} 
+              style={{ backgroundColor: '#fadb14', color: '#000' }} 
+            />
+          </div>
           
           <div style={{ textAlign: 'left' }}>
             <Text type="secondary">Полное имя</Text>
@@ -132,7 +128,28 @@ const Profile = () => {
                 style={{ marginTop: 8, background: '#000', color: '#fff', border: '1px solid #434343' }}
               />
             ) : (
-              <Title level={4} style={{ marginTop: 8, color: '#fff', margin: 0 }}>{userData.name}</Title>
+              <Title level={4} style={{ marginTop: 8, color: '#fff', margin: 0 }}>
+                {userData.name}
+              </Title>
+            )}
+          </div>
+
+          {/* НОВОЕ ПОЛЕ: Команда */}
+          <div style={{ textAlign: 'left' }}>
+            <Text type="secondary">Команда / Отдел</Text>
+            {isEditing ? (
+              <Input 
+                value={userData.team} 
+                prefix={<TeamOutlined />}
+                onChange={(e) => setUserData({...userData, team: e.target.value})} 
+                style={{ marginTop: 8, background: '#000', color: '#fff', border: '1px solid #434343' }}
+              />
+            ) : (
+              <div style={{ marginTop: 8 }}>
+                <Text style={{ color: '#fadb14', fontSize: '16px', fontWeight: '500' }}>
+                   {userData.team}
+                </Text>
+              </div>
             )}
           </div>
 
@@ -140,15 +157,17 @@ const Profile = () => {
             <Text type="secondary">Роль в системе</Text>
             <div style={{ marginTop: 8 }}>
               <Tag color={userData.role === 'ADMIN' ? 'red' : 'gold'}>
-                {userData.role.toUpperCase()}
+                {ROLE_LABELS[userData.role] || userData.role}
               </Tag>
             </div>
           </div>
 
           <div style={{ textAlign: 'left' }}>
-            <Text type="secondary">Email (логин)</Text>
+            <Text type="secondary">Логин</Text>
             <div style={{ marginTop: 8 }}>
-              <Text style={{ color: '#fff' }}>{userData.email}</Text>
+              <Text style={{ color: '#fff', fontSize: '16px' }}>
+                {userData.login}
+              </Text>
             </div>
           </div>
         </Space>

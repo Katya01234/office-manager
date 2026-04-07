@@ -19,8 +19,7 @@ const BookingWidgets = ({ userStats, onCancelBooking }) => {
           <Space direction="vertical">
             <Text type="secondary"><PushpinFilled /> Закреплено за вами</Text>
             <Title level={4} style={{ margin: 0, color: '#fff' }}>
-              {/* Если у пользователя есть место со статусом assigned в API */}
-              {userStats?.mainPlace || 'Закрепленного за Вами места нет'}
+            {userStats?.mainPlace?.name || 'Нет закрепленного места'}
             </Title>
           </Space>
         </Card>
@@ -32,7 +31,7 @@ const BookingWidgets = ({ userStats, onCancelBooking }) => {
           <Space direction="vertical">
             <Text type="secondary"><HeartFilled style={{ color: '#ff4d4f' }} /> Любимая локация</Text>
             <Title level={4} style={{ margin: 0, color: userStats?.favoritePlace ? '#fff' : '#555' }}>
-              {userStats?.favoritePlace || 'Не выбрано'}
+            {userStats?.favoritePlace?.name || 'Не выбрано'}
             </Title>
           </Space>
         </Card>

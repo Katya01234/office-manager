@@ -1,11 +1,6 @@
 import React from 'react';
-import { Layout, Menu } from 'antd';
-import { 
-  DashboardOutlined, 
-  UserOutlined, 
-  EnvironmentOutlined, 
-  TeamOutlined 
-} from '@ant-design/icons';
+import { Layout, Menu, ConfigProvider } from 'antd';
+import { DashboardOutlined, UserOutlined, EnvironmentOutlined, TeamOutlined } from '@ant-design/icons';
 import { Link, useLocation } from 'react-router-dom'; 
 
 const { Sider } = Layout;
@@ -13,29 +8,14 @@ const { Sider } = Layout;
 const Sidebar = ({ collapsed, setCollapsed }) => {
   const location = useLocation();
 
-  const selectedKey = location.pathname.substring(1) || 'dashboard';
+  // Умное определение активного ключа
+  const currentPath = location.pathname.split('/')[1] || 'dashboard';
 
   const menuItems = [
-    { 
-      key: 'dashboard', 
-      icon: <DashboardOutlined />, 
-      label: <Link to="/dashboard">Дашборд</Link> 
-    },
-    { 
-      key: 'profile', 
-      icon: <UserOutlined />, 
-      label: <Link to="/profile">Профиль</Link> 
-    },
-    { 
-      key: 'map', 
-      icon: <EnvironmentOutlined />, 
-      label: <Link to="/map">Карта</Link> 
-    },
-    { 
-      key: 'friends', 
-      icon: <TeamOutlined />, 
-      label: <Link to="/friends">Коллеги</Link> 
-    },
+    { key: 'dashboard', icon: <DashboardOutlined />, label: <Link to="/dashboard">Дашборд</Link> },
+    { key: 'profile', icon: <UserOutlined />, label: <Link to="/profile">Профиль</Link> },
+    { key: 'map', icon: <EnvironmentOutlined />, label: <Link to="/map">Карта</Link> },
+    { key: 'friends', icon: <TeamOutlined />, label: <Link to="/friends">Коллеги</Link> },
   ];
 
   return (
@@ -46,28 +26,30 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
       width={250}
       style={{
         background: '#000',
-        borderRight: '2px solid #fadb14',
-        boxShadow: '4px 0px 15px rgba(250, 219, 20, 0.3)',
+        borderRight: '1px solid #333', // Сделал чуть тоньше и спокойнее
+        zIndex: 10,
       }}
     >
       <div style={{ 
-        height: 60, 
+        height: 64, 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center', 
         color: '#fadb14', 
-        fontWeight: 'bold',
-        fontSize: collapsed ? '14px' : '18px',
-        transition: 'all 0.2s'
+        fontWeight: 800,
+        letterSpacing: '1px',
+        fontSize: collapsed ? '14px' : '16px',
+        transition: 'all 0.3s',
+        borderBottom: '1px solid #1f1f1f'
       }}>
-        {collapsed ? 'OM' : 'WORKPLACE MANAGER'}
+        {collapsed ? 'WM' : 'WORKPLACE MANAGER'}
       </div>
       
       <Menu
         theme="dark" 
-        selectedKeys={[selectedKey]}
+        selectedKeys={[currentPath]}
         mode="inline"
-        style={{ background: 'transparent', marginTop: '20px' }}
+        style={{ background: 'transparent', marginTop: '16px', border: 'none' }}
         items={menuItems}
       />
     </Sider>

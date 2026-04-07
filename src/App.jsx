@@ -4,7 +4,6 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 import Sidebar from "./components/Layout/Sidebar";
 import Login from './pages/Login.jsx';
-import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard/index.jsx';
 import Profile from './pages/Profile.jsx'; 
 import Friends from './pages/Friends.jsx';
@@ -16,22 +15,21 @@ const App = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   
-  // 1. Делаем авторизацию состоянием
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('access_token'));
 
-  // 2. Обновляем статус при каждом переходе (важно для корректных редиректов)
   useEffect(() => {
     setIsAuthenticated(!!localStorage.getItem('access_token'));
   }, [location.pathname]);
 
   const currentTheme = customColors.dark;
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+  
+  // Обновляем проверку страницы авторизации (теперь только login)
+  const isAuthPage = location.pathname === '/login';
 
   return (
     <ConfigProvider theme={{ ...themeConfig, algorithm: theme.darkAlgorithm }}>
       <Layout style={{ minHeight: '100vh', width: '100vw', background: '#000' }}>
         
-        {/* Sidebar только для своих */}
         {isAuthenticated && !isAuthPage && (
           <Sidebar 
             collapsed={collapsed}
@@ -42,14 +40,10 @@ const App = () => {
         <Layout style={{ background: '#000' }}>
           <Content style={{ padding: isAuthPage ? 0 : '40px' }}>
             <Routes>
-              {/* Если мы авторизованы и заходим на /login — отправляем на /dashboard */}
+              {/* Авторизация */}
               <Route 
                 path="/login" 
                 element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} 
-              />
-              <Route 
-                path="/register" 
-                element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} 
               />
 
               {/* Защищенные роуты */}
@@ -68,7 +62,7 @@ const App = () => {
               
               <Route path="/map" element={isAuthenticated ? <div style={{ color: '#fff' }}>Карта офиса</div> : <Navigate to="/login" replace />} />
 
-              {/* По умолчанию на дашборд (он сам решит, пустить или нет) */}
+              {/* Редиректы */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

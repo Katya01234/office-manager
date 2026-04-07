@@ -1,53 +1,63 @@
 import React from 'react';
-import { Card, Space, Button, Select, Typography } from 'antd';
-import { CloseCircleOutlined } from '@ant-design/icons';
+import { Card, Space, Button, DatePicker, TimePicker, Typography } from 'antd';
+import { CloseCircleOutlined, CalendarOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 
 const { Text } = Typography;
-const { Option } = Select;
 
 const PlacesFilters = ({ filters, setFilters }) => {
+  // Проверка: применен ли хотя бы один фильтр
+  const hasActiveFilters = filters.date || filters.timeRange;
+
+  // Сброс фильтров даты и времени
+  const handleReset = () => {
+    setFilters(prev => ({
+      ...prev,
+      date: null,
+      timeRange: null
+    }));
+  };
+
   return (
     <Card 
-      style={{ background: '#141414', borderColor: '#333', marginBottom: 16 }} 
+      style={{ background: '#141414', borderColor: '#333', borderRadius: '8px' }} 
       bodyStyle={{ padding: '12px 24px' }}
     >
-      <Space size="large" wrap>
-        <Text strong style={{ color: '#8c8c8c' }}>Фильтры:</Text>
+      <Space size="middle" wrap>
+        <Text strong style={{ color: '#8c8c8c' }}>Поиск по времени:</Text>
         
-        <Button 
-          style={filters.onlyWindow ? { background: '#fadb14', color: '#000', border: 'none' } : {}}
-          onClick={() => setFilters(prev => ({ ...prev, onlyWindow: !prev.onlyWindow }))}
-        >
-          У окна
-        </Button>
+        {/* Выбор даты */}
+        <DatePicker 
+          placeholder="Выбрать дату"
+          value={filters.date}
+          onChange={(date) => setFilters(prev => ({ ...prev, date }))}
+          // Запрещаем выбор прошедших дат
+          disabledDate={(current) => current && current < dayjs().startOf('day')}
+          style={{ width: 150 }}
+          suffixIcon={<CalendarOutlined />}
+        />
 
-        <Select 
-          value={filters.minMonitors} 
-          style={{ width: 160 }}
-          dropdownStyle={{ background: '#1f1f1f' }}
-          onChange={(val) => setFilters(prev => ({ ...prev, minMonitors: val }))}
-        >
-          <Option value={0}>Мониторы: Любое</Option>
-          <Option value={1}>1 монитор</Option>
-          <Option value={2}>2+ монитора</Option>
-        </Select>
-
-        <Button 
-          style={filters.onlyQuiet ? { background: '#fadb14', color: '#000', border: 'none' } : {}}
-          onClick={() => setFilters(prev => ({ ...prev, onlyQuiet: !prev.onlyQuiet }))}
-        >
-          Тихая зона
-        </Button>
+        {/* Выбор временного интервала */}
+        <TimePicker.RangePicker 
+          placeholder={['Начало', 'Конец']}
+          value={filters.timeRange}
+          format="HH:mm"
+          minuteStep={15}
+          onChange={(range) => setFilters(prev => ({ ...prev, timeRange: range }))}
+          style={{ width: 210 }}
+          suffixIcon={<ClockCircleOutlined />}
+        />
 
         {/* Кнопка сброса */}
-        {(filters.onlyWindow || filters.minMonitors > 0 || filters.onlyQuiet) && (
+        {hasActiveFilters && (
           <Button 
             type="link" 
             danger 
             icon={<CloseCircleOutlined />}
-            onClick={() => setFilters({ onlyWindow: false, minMonitors: 0, onlyQuiet: false })}
+            onClick={handleReset}
+            style={{ paddingLeft: '8px' }}
           >
-            Сбросить
+            Сбросить время
           </Button>
         )}
       </Space>

@@ -6,6 +6,13 @@ import dayjs from 'dayjs';
 const { Text } = Typography;
 
 const HistorySidebar = ({ history }) => {
+  // 1. ФИЛЬТРАЦИЯ И СОРТИРОВКА
+  // Оставляем только те брони, которые уже закончились (end_datetime < сейчас)
+  // И сортируем их так, чтобы самые свежие были сверху
+  const processedHistory = (history || [])
+    .filter(item => dayjs(item.end_datetime).isBefore(dayjs())) 
+    .sort((a, b) => dayjs(b.start_datetime).diff(dayjs(a.start_datetime)));
+
   return (
     <Card 
       title={<span style={{ color: '#fff' }}><HistoryOutlined /> История посещений</span>} 
@@ -17,11 +24,10 @@ const HistorySidebar = ({ history }) => {
       }}
       bodyStyle={{ padding: '16px' }}
     >
-      {history?.length > 0 ? (
-        // Сортируем историю: самые свежие сверху
-        [...history].reverse().map(item => (
+      {processedHistory.length > 0 ? (
+        processedHistory.map(item => (
           <div 
-            key={item.id} // У Славы это id
+            key={item.id}
             style={{ 
               paddingBottom: 12, 
               marginBottom: 12, 
@@ -32,7 +38,6 @@ const HistorySidebar = ({ history }) => {
               <Text strong style={{ color: '#fadb14' }}>
                 {item.workspace_name}
               </Text>
-              {/* Статус в истории обычно завершен, можно вывести время */}
               <Tag color="#262626" style={{ fontSize: '10px', color: '#8c8c8c', border: 'none' }}>
                 DONE
               </Tag>
