@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://45.86.183.29:8080';
+const API_URL = 'https://rikkiter.ru';
 
 // 1. Экземпляр axios
 const api = axios.create({
@@ -27,8 +27,6 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refresh_token');
-        
-        // ВНИМАНИЕ: Убрал /api/v1, чтобы путь соответствовал baseURL
         const res = await axios.post(`${API_URL}/auth/refresh`, {
           refresh_token: refreshToken
         });

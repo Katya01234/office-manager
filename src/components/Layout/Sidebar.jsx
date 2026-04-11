@@ -7,8 +7,6 @@ const { Sider } = Layout;
 
 const Sidebar = ({ collapsed, setCollapsed }) => {
   const location = useLocation();
-
-  // Умное определение активного ключа
   const currentPath = location.pathname.split('/')[1] || 'dashboard';
 
   const menuItems = [
@@ -26,7 +24,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
       width={250}
       style={{
         background: '#000',
-        borderRight: '1px solid #333', // Сделал чуть тоньше и спокойнее
+        borderRight: '1px solid #333', 
         zIndex: 10,
       }}
     >

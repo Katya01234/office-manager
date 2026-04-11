@@ -1,7 +1,5 @@
-// src/api/mockData.js
 import dayjs from 'dayjs';
 
-// Теперь поля называются как в Swagger: start_datetime, workspace_name и т.д. 
 export const mockUserStats = {
   favoritePlace: "А-101",
   history: [
@@ -18,9 +16,9 @@ export const mockPlaces = [
   { 
     id: 1, 
     name: 'А-101', 
-    is_assigned: true, // Поле из Swagger 
+    is_assigned: true, 
     description: 'Тихая зона у окна',
-    equipment: ["монитор", "Wi-Fi"] // Из Swagger 
+    equipment: ["монитор", "Wi-Fi"] 
   },
   { id: 2, name: 'Б-202', is_assigned: false, description: 'Open Space' }
 ];

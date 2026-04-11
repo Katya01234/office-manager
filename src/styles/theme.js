@@ -2,8 +2,8 @@ import { theme } from 'antd';
 
 export const themeConfig = {
   token: {
-    colorPrimary: '#fadb14',    // Твой --primary-yellow
-    colorError: '#ff1212',      // Твой --danger-red
+    colorPrimary: '#fadb14',    // --primary-yellow
+    colorError: '#ff1212',      //--danger-red
     borderRadius: 12,           // Скругление углов
     fontFamily: 'system-ui, Avenir, Helvetica, Arial, sans-serif',
   },
