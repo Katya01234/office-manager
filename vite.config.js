@@ -6,10 +6,10 @@ export default defineConfig({
   plugins: [react()],
   
   server: {
-    // Устанавливаем адрес и порт, которые просил партнер
+    // Твои настройки для порта 5500
     host: '127.0.0.1',
     port: 5500,
-    strictPort: true, // Чтобы Vite не перекинул тебя на другой порт, если 5500 занят
+    strictPort: true, 
     
     proxy: {
       '/api': {
@@ -18,5 +18,18 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Эта функция разбивает код на части
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000, 
   },
 })
