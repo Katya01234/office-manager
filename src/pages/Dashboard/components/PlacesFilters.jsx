@@ -6,14 +6,20 @@ import dayjs from 'dayjs';
 const { Text } = Typography;
 
 const PlacesFilters = ({ filters, setFilters }) => {
-  // Проверка: применен ли хотя бы один фильтр
-  const hasActiveFilters = filters.date || filters.timeRange;
+  // Дата по умолчанию — завтра
+  const tomorrow = dayjs().add(1, 'day').startOf('day');
 
-  // Сброс фильтров даты и времени
+  // Проверка: изменены ли фильтры относительно состояния "по умолчанию"
+  // Показываем кнопку сброса, если дата не завтра ИЛИ выбран интервал времени
+  const hasChanges = 
+    (filters.date && !filters.date.isSame(tomorrow, 'day')) || 
+    filters.timeRange !== null;
+
+  // Сброс фильтров к состоянию "Завтра, весь день"
   const handleReset = () => {
     setFilters(prev => ({
       ...prev,
-      date: null,
+      date: tomorrow,
       timeRange: null
     }));
   };
@@ -30,10 +36,12 @@ const PlacesFilters = ({ filters, setFilters }) => {
         <DatePicker 
           placeholder="Выбрать дату"
           value={filters.date}
+          allowClear={false} // Убираем крестик внутри, чтобы не сбросить в null
           onChange={(date) => setFilters(prev => ({ ...prev, date }))}
-          // Запрещаем выбор прошедших дат
+          // Запрещаем выбор прошедших дат (сегодня выбирать можно, если нужно, 
+          // но по умолчанию стоит завтра)
           disabledDate={(current) => current && current < dayjs().startOf('day')}
-          style={{ width: 150 }}
+          style={{ width: 160 }}
           suffixIcon={<CalendarOutlined />}
         />
 
@@ -48,16 +56,16 @@ const PlacesFilters = ({ filters, setFilters }) => {
           suffixIcon={<ClockCircleOutlined />}
         />
 
-        {/* Кнопка сброса */}
-        {hasActiveFilters && (
+        {/* Кнопка возврата к завтрашнему дню */}
+        {hasChanges && (
           <Button 
             type="link" 
             danger 
             icon={<CloseCircleOutlined />}
             onClick={handleReset}
-            style={{ paddingLeft: '8px' }}
+            style={{ paddingLeft: '8px', display: 'flex', alignItems: 'center' }}
           >
-            Сбросить время
+            Вернуть на завтра
           </Button>
         )}
       </Space>

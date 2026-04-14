@@ -11,9 +11,9 @@ const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId }) => {
       dataIndex: 'name', 
       key: 'name',
       render: (name, record) => {
-        // Фильтруем только реальные временные интервалы для Tooltip
+        // Фильтруем слоты, оставляя только временные интервалы
         const realTimeSlots = record.freeSlots?.filter(
-          slot => slot !== "Занято сейчас" && slot !== "Нет слотов"
+          slot => slot !== "Нет слотов"
         ) || [];
 
         return (
@@ -52,7 +52,8 @@ const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId }) => {
               )}
             </span>
             
-            {record.status === 'assigned' && (
+            {/* Используем is_assigned из нового Swagger */}
+            {record.is_assigned && (
               <Tag icon={<LockOutlined />} color="#434343" style={{ border: 'none', borderRadius: '4px' }}>
                 Постоянное
               </Tag>
@@ -80,30 +81,12 @@ const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId }) => {
       )
     },
     { 
-      title: 'Статус', 
-      dataIndex: 'freeSlots', 
-      key: 'status',
-      render: (freeSlots, record) => {
-        const isCurrentlyBusy = freeSlots?.includes("Занято сейчас");
-        
-        if (record.status === 'assigned') {
-          return <Tag color="#262626" style={{ color: '#8c8c8c', border: '1px solid #434343' }}>FIXED</Tag>;
-        }
-        
-        if (isCurrentlyBusy) {
-          return <Tag color="#410a0a" style={{ color: '#ff4d4f', border: '1px solid #820014' }}>ЗАНЯТО</Tag>;
-        }
-        
-        return <Tag color="#fff" style={{ color: '#000', background: '#fff', border: 'none' }}>СВОБОДНО</Tag>;
-      } 
-    },
-    { 
       title: 'Действие', 
       key: 'action',
       render: (_, record) => {
-        // Кнопка активна, если место не FIXED и есть хотя бы один слот (не равно "Нет слотов")
+        // Кнопка активна, если место не закреплено (is_assigned) и есть слоты
         const hasNoSlots = record.freeSlots?.includes("Нет слотов");
-        const isBookable = record.status !== 'assigned' && !hasNoSlots;
+        const isBookable = !record.is_assigned && !hasNoSlots;
         
         return (
           <Button 
@@ -118,7 +101,7 @@ const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId }) => {
               minWidth: '120px'
             }}
           >
-            {record.status === 'assigned' ? 'Закреплено' : 'Забронировать'}
+            {record.is_assigned ? 'Закреплено' : 'Забронировать'}
           </Button>
         );
       } 

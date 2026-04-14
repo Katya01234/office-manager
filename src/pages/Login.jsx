@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, Input, Button, Typography, message, Form } from 'antd';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { workspaceApi } from "../api";
+import { workspaceApi } from "../api/api";
 
 const { Title, Text } = Typography;
 
