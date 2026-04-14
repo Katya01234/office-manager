@@ -65,7 +65,7 @@ const BookingWidgets = ({ userStats, places, onSelectPlace, onCancelBooking }) =
           hoverable={!!favoriteFullData && isFavoriteFree}
           style={{ 
             background: '#141414', 
-            borderLeft: '4px solid #fadb14', 
+            borderLeft: '4px solid #fa1814', 
             height: '100%', 
             borderRadius: '8px',
             cursor: (favoriteFullData && isFavoriteFree) ? 'pointer' : 'default'
@@ -77,7 +77,7 @@ const BookingWidgets = ({ userStats, places, onSelectPlace, onCancelBooking }) =
           <Space direction="vertical" style={{ width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
               <Text type="secondary">
-                <HeartFilled style={{ color: '#fadb14' }} /> Любимая локация
+                <HeartFilled style={{ color: '#fa1814' }} /> Любимая локация
               </Text>
               {favoriteFullData && (
                 <Tag color={isFavoriteFree ? 'success' : 'error'} style={{ marginRight: 0 }}>

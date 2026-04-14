@@ -10,6 +10,7 @@ import PlacesFilters from "./components/PlacesFilters.jsx";
 import PlacesTable from "./components/PlacesTable.jsx";
 import BookingModal from "./components/BookingModal";
 import HistorySidebar from "./components/HistorySidebar.jsx";
+import VKWidget from "./components/VKWidget.jsx"; // Твой новый виджет
 
 dayjs.extend(isBetween);
 const { Content } = Layout;
@@ -19,7 +20,6 @@ const Dashboard = () => {
   const [places, setPlaces] = useState([]);
   const [userStats, setUserStats] = useState({ history: [], favoritePlace: null, mainPlace: null });
   
-  // 1. По умолчанию устанавливаем дату на завтра
   const [filters, setFilters] = useState({ 
     onlyFree: false,
     date: dayjs().add(1, 'day').startOf('day'), 
@@ -29,7 +29,7 @@ const Dashboard = () => {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // --- РАСЧЕТ СВОБОДНЫХ ИНТЕРВАЛОВ ---
+  // --- ЛОГИКА РАСЧЕТА СЛОТОВ ---
   const calculateFreeSlots = useCallback((bookings = [], targetDate) => {
     const startDay = targetDate.clone().hour(9).minute(0).second(0);
     const endDay = targetDate.clone().hour(22).minute(0).second(0);
@@ -44,20 +44,15 @@ const Dashboard = () => {
     dayBookings.forEach(booking => {
       const bStart = dayjs(booking.start_datetime);
       const bEnd = dayjs(booking.end_datetime);
-
       if (bStart.isAfter(currentPos.add(14, 'minute'))) {
         freeSlots.push(`${currentPos.format('HH:mm')} - ${bStart.format('HH:mm')}`);
       }
-      
-      if (bEnd.isAfter(currentPos)) { 
-        currentPos = bEnd; 
-      }
+      if (bEnd.isAfter(currentPos)) { currentPos = bEnd; }
     });
 
     if (currentPos.isBefore(endDay.subtract(14, 'minute'))) {
       freeSlots.push(`${currentPos.format('HH:mm')} - ${endDay.format('HH:mm')}`);
     }
-
     return freeSlots.length > 0 ? freeSlots : ["Нет слотов"];
   }, []);
 
@@ -97,46 +92,37 @@ const Dashboard = () => {
     }
   }, []);
 
-  useEffect(() => { 
-    loadData(); 
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  // --- ФУНКЦИЯ ОТМЕНЫ БРОНИРОВАНИЯ ---
   const handleCancel = async (bookingId) => {
     try {
       await workspaceApi.deleteBooking(bookingId);
       message.success("Бронирование успешно завершено");
-      loadData(); // Обновляем данные после удаления
+      loadData();
     } catch (e) {
       message.error("Не удалось завершить бронирование");
     }
   };
 
-  // --- ФИЛЬТРАЦИЯ И ОБОГАЩЕНИЕ ---
+  // --- ФИЛЬТРАЦИЯ ---
   const filteredPlaces = useMemo(() => {
     const targetDate = filters.date || dayjs().add(1, 'day');
-
     return places.filter(place => {
-      // Фильтр "Только свободные"
       if (filters.onlyFree) {
         const isOccupiedNow = place.activeBookings.some(b => 
           dayjs().isBetween(dayjs(b.start_datetime), dayjs(b.end_datetime))
         );
         if (isOccupiedNow) return false;
       }
-
-      // Фильтр по диапазону времени
       if (filters.timeRange) {
         const [start, end] = filters.timeRange;
         const fullStart = targetDate.clone().hour(start.hour()).minute(start.minute());
         const fullEnd = targetDate.clone().hour(end.hour()).minute(end.minute());
-
         const isOccupied = place.activeBookings.some(b => {
           const bStart = dayjs(b.start_datetime);
           const bEnd = dayjs(b.end_datetime);
           return fullStart.isBefore(bEnd) && fullEnd.isAfter(bStart);
         });
-        
         if (isOccupied) return false;
       }
       return true;
@@ -155,7 +141,6 @@ const Dashboard = () => {
           </div>
         ) : (
           <>
-            {/* Виджеты статистики и быстрого доступа */}
             <BookingWidgets 
               userStats={userStats} 
               places={places} 
@@ -174,37 +159,32 @@ const Dashboard = () => {
               <Col xs={24} lg={16}>
                 <PlacesTable 
                   data={filteredPlaces} 
-                  onBook={(place) => { 
-                    setSelectedPlace(place); 
-                    setIsModalOpen(true); 
-                  }}
+                  onBook={(place) => { setSelectedPlace(place); setIsModalOpen(true); }}
                   favoritePlaceId={userStats.favoritePlace?.id} 
                   onToggleFavorite={async (id) => {
                     try {
                       await workspaceApi.toggleFavorite(id);
                       loadData();
-                    } catch (e) {
-                      message.error("Ошибка обновления избранного");
-                    }
+                    } catch (e) { message.error("Ошибка обновления избранного"); }
                   }}
                 />
               </Col>
+              
               <Col xs={24} lg={8}>
+                {/* Теперь тут один аккуратный компонент */}
+                <VKWidget />
+                
                 <HistorySidebar history={userStats.history} />
               </Col>
             </Row>
           </>
         )}
 
-        {/* Модальное окно бронирования */}
         <BookingModal 
           open={isModalOpen} 
           place={selectedPlace}
           initialDate={filters.date}
-          onCancel={() => {
-            setIsModalOpen(false);
-            setSelectedPlace(null);
-          }}
+          onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
           onConfirm={async (vals) => {
             try {
               await workspaceApi.createBooking({
@@ -216,9 +196,7 @@ const Dashboard = () => {
               setIsModalOpen(false);
               setSelectedPlace(null);
               setTimeout(() => loadData(), 500); 
-            } catch (e) {
-              message.error('Ошибка: выбранное время уже занято');
-            }
+            } catch (e) { message.error('Ошибка: выбранное время уже занято'); }
           }}
         />
       </Content>
