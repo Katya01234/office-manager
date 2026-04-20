@@ -35,9 +35,8 @@ const Dashboard = () => {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // --- ЛОГИКА РАСЧЕТА СЛОТОВ (Минимум 2 часа) ---
   const calculateFreeSlots = useCallback((bookings = [], targetDate) => {
-    const MIN_DURATION = 120; // 2 часа в минутах
+    const MIN_DURATION = 120;
     const startDay = targetDate.clone().hour(9).minute(0).second(0);
     const endDay = targetDate.clone().hour(22).minute(0).second(0);
     
@@ -51,8 +50,6 @@ const Dashboard = () => {
     dayBookings.forEach(booking => {
       const bStart = dayjs(booking.start_datetime);
       const bEnd = dayjs(booking.end_datetime);
-      
-      // Если между текущей позицией и началом брони больше 120 минут
       if (bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
         freeSlots.push(`${currentPos.format('HH:mm')} - ${bStart.format('HH:mm')}`);
       }
@@ -65,7 +62,6 @@ const Dashboard = () => {
     return freeSlots;
   }, []);
 
-  // --- ЗАГРУЗКА ДАННЫХ ---
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -81,7 +77,6 @@ const Dashboard = () => {
       const allActive = bookRes.status === 'fulfilled' ? bookRes.value : [];
       const historyRes = histRes.status === 'fulfilled' ? histRes.value : [];
       
-      // Объединяем для виджетов
       const combinedHistory = [...allActive, ...historyRes];
       const uniqueHistory = Array.from(new Map(combinedHistory.map(item => [item.id, item])).values());
 
@@ -141,7 +136,6 @@ const Dashboard = () => {
       return true;
     }).map(place => ({
       ...place,
-      // Считаем слоты именно для даты из фильтра
       freeSlots: calculateFreeSlots(place.activeBookings, targetDate)
     }));
   }, [places, filters, calculateFreeSlots]);
@@ -186,7 +180,11 @@ const Dashboard = () => {
                     setUserStats(prev => ({ ...prev, isVkConnected: true }));
                   }} />
                 )}
-                <HistorySidebar history={userStats.history} />
+                {/* ПЕРЕДАЕМ ИСТОРИЮ И ФУНКЦИЮ ОТМЕНЫ */}
+                <HistorySidebar 
+                  history={userStats.history} 
+                  onCancelBooking={handleCancel} 
+                />
               </Col>
             </Row>
           </>
@@ -199,7 +197,6 @@ const Dashboard = () => {
           initialTimeRange={filters.timeRange}
           onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
           onConfirm={async (vals) => {
-            // Валидация на 2 часа перед отправкой
             if (vals.end.diff(vals.start, 'minute') < 120) {
               return message.error('Минимальное время — 2 часа');
             }
