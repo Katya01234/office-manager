@@ -5,127 +5,62 @@ import dayjs from 'dayjs';
 const { Text } = Typography;
 
 const BookingModal = ({ open, onCancel, onConfirm, place, initialDate, initialTimeRange }) => {
-  // Состояние для выбранной даты и интервала времени
   const [selectedDate, setSelectedDate] = useState(null);
   const [timeRange, setTimeRange] = useState(null);
 
   useEffect(() => {
     if (open) {
-      // 1. Устанавливаем дату из фильтров Dashboard или завтрашний день по умолчанию
       const targetDate = initialDate || dayjs().add(1, 'day').startOf('day');
       setSelectedDate(targetDate);
       
-      // 2. Синхронизируем время с фильтрами
-      if (initialTimeRange && initialTimeRange[0] && initialTimeRange[1]) {
-        // Если в фильтрах на главной выбрано время, копируем его в модалку
-        setTimeRange([
-          initialTimeRange[0],
-          initialTimeRange[1]
-        ]);
+      if (initialTimeRange) {
+        setTimeRange([initialTimeRange[0], initialTimeRange[1]]);
       } else {
-        // Если время не выбрано, ставим стандартный рабочий интервал (9:00 - 18:00)
-        setTimeRange([
-          targetDate.clone().hour(9).minute(0),
-          targetDate.clone().hour(18).minute(0)
-        ]);
+        setTimeRange([targetDate.clone().hour(9), targetDate.clone().hour(11)]); // Дефолт 2 часа
       }
     }
   }, [open, initialDate, initialTimeRange]);
 
-  // Запрет выбора прошедших дат
-  const disabledDate = (current) => {
-    return current && current < dayjs().startOf('day');
-  };
-
   const handleConfirm = () => {
-    if (!timeRange || !timeRange[0] || !timeRange[1] || !selectedDate) {
-      return message.error('Укажите дату и временной интервал');
-    }
+    if (!timeRange || !selectedDate) return message.error('Заполните все поля');
 
-    // Собираем финальные объекты даты и времени для отправки на бэкенд
-    const finalStart = selectedDate.clone()
-      .hour(timeRange[0].hour())
-      .minute(timeRange[0].minute())
-      .second(0);
+    const start = selectedDate.clone().hour(timeRange[0].hour()).minute(timeRange[0].minute()).second(0);
+    const end = selectedDate.clone().hour(timeRange[1].hour()).minute(timeRange[1].minute()).second(0);
+
+    if (start.isBefore(dayjs())) return message.error('Нельзя бронировать в прошлом');
+    if (end.isBefore(start) || end.isSame(start)) return message.error('Неверный интервал');
     
-    const finalEnd = selectedDate.clone()
-      .hour(timeRange[1].hour())
-      .minute(timeRange[1].minute())
-      .second(0);
-
-    // Валидация перед отправкой
-    if (finalStart.isBefore(dayjs())) {
-      return message.error('Нельзя забронировать время в прошлом');
+    // ПРОВЕРКА НА 2 ЧАСА
+    if (end.diff(start, 'minute') < 120) {
+      return message.error('Минимальное время бронирования — 2 часа');
     }
     
-    if (finalEnd.isBefore(finalStart) || finalEnd.isSame(finalStart)) {
-      return message.error('Время окончания должно быть позже времени начала');
-    }
-
-    if (finalEnd.diff(finalStart, 'minute') < 15) {
-      return message.error('Минимальное время бронирования — 15 минут');
-    }
-    
-    // Передаем готовые объекты в родительский компонент
-    onConfirm({ start: finalStart, end: finalEnd });
+    onConfirm({ start, end });
   };
 
   return (
     <Modal
-      title={
-        <span style={{ color: '#fff' }}>
-          Забронировать: <span style={{ color: '#fadb14' }}>{place?.name}</span>
-        </span>
-      }
+      title={<span style={{ color: '#fff' }}>Забронировать: <span style={{ color: '#fadb14' }}>{place?.name}</span></span>}
       open={open}
       onCancel={onCancel}
       centered
-      // Стилизация под темную тему вашего приложения
-      styles={{
-        content: { background: '#141414', border: '1px solid #333' },
-        header: { background: '#141414', borderBottom: '1px solid #333', paddingBottom: '12px' }
-      }}
+      styles={{ content: { background: '#141414', border: '1px solid #333' }, header: { background: '#141414' }}}
       footer={[
-        <Button key="cancel" onClick={onCancel} style={{ background: 'transparent', color: '#8c8c8c', borderColor: '#434343' }}>
-          Отмена
-        </Button>,
-        <Button 
-          key="ok" 
-          type="primary" 
-          onClick={handleConfirm}
-          style={{ background: '#fadb14', color: '#000', border: 'none', fontWeight: 'bold' }}
-        >
-          Подтвердить бронь
+        <Button key="back" onClick={onCancel} ghost>Отмена</Button>,
+        <Button key="submit" type="primary" onClick={handleConfirm} style={{ background: '#fadb14', color: '#000', border: 'none' }}>
+          Подтвердить
         </Button>
       ]}
     >
       <Space direction="vertical" style={{ width: '100%', marginTop: '16px' }} size="large">
+        <Text style={{ color: '#fadb14' }}>* Минимальное время бронирования — 2 часа</Text>
         <div>
-          <Text style={{ color: '#8c8c8c', marginBottom: 8, display: 'block' }}>Дата</Text>
-          <DatePicker 
-            value={selectedDate} 
-            onChange={setSelectedDate} 
-            disabledDate={disabledDate} 
-            style={{ width: '100%' }} 
-            allowClear={false}
-          />
+          <Text style={{ color: '#8c8c8c' }}>Дата</Text>
+          <DatePicker value={selectedDate} onChange={setSelectedDate} style={{ width: '100%' }} disabledDate={c => c < dayjs().startOf('day')} />
         </div>
-
         <div>
-          <Text style={{ color: '#8c8c8c', marginBottom: 8, display: 'block' }}>Время (с — по)</Text>
-          <TimePicker.RangePicker 
-            value={timeRange} 
-            onChange={setTimeRange} 
-            format="HH:mm" 
-            minuteStep={15}
-            style={{ width: '100%' }} 
-            placeholder={['Начало', 'Конец']}
-          />
-          {place?.is_assigned && (
-             <Text type="warning" style={{ fontSize: '12px', marginTop: '8px', display: 'block' }}>
-               Внимание: это место закреплено за другим пользователем.
-             </Text>
-          )}
+          <Text style={{ color: '#8c8c8c' }}>Время</Text>
+          <TimePicker.RangePicker value={timeRange} onChange={setTimeRange} format="HH:mm" minuteStep={15} style={{ width: '100%' }} />
         </div>
       </Space>
     </Modal>

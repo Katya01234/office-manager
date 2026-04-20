@@ -35,8 +35,9 @@ const Dashboard = () => {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // --- ЛОГИКА РАСЧЕТА СЛОТОВ ---
+  // --- ЛОГИКА РАСЧЕТА СЛОТОВ (Минимум 2 часа) ---
   const calculateFreeSlots = useCallback((bookings = [], targetDate) => {
+    const MIN_DURATION = 120; // 2 часа в минутах
     const startDay = targetDate.clone().hour(9).minute(0).second(0);
     const endDay = targetDate.clone().hour(22).minute(0).second(0);
     
@@ -50,16 +51,18 @@ const Dashboard = () => {
     dayBookings.forEach(booking => {
       const bStart = dayjs(booking.start_datetime);
       const bEnd = dayjs(booking.end_datetime);
-      if (bStart.isAfter(currentPos.add(14, 'minute'))) {
+      
+      // Если между текущей позицией и началом брони больше 120 минут
+      if (bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
         freeSlots.push(`${currentPos.format('HH:mm')} - ${bStart.format('HH:mm')}`);
       }
       if (bEnd.isAfter(currentPos)) { currentPos = bEnd; }
     });
 
-    if (currentPos.isBefore(endDay.subtract(14, 'minute'))) {
+    if (endDay.diff(currentPos, 'minute') >= MIN_DURATION) {
       freeSlots.push(`${currentPos.format('HH:mm')} - ${endDay.format('HH:mm')}`);
     }
-    return freeSlots.length > 0 ? freeSlots : ["Нет слотов"];
+    return freeSlots;
   }, []);
 
   // --- ЗАГРУЗКА ДАННЫХ ---
@@ -68,58 +71,50 @@ const Dashboard = () => {
     try {
       const [wsRes, bookRes, favRes, histRes, mainRes] = await Promise.allSettled([
         workspaceApi.getWorkspaces(),
-        workspaceApi.getBookings(), // Активные и будущие брони
+        workspaceApi.getBookings(),
         workspaceApi.getFavorite(),
-        workspaceApi.getBookingHistory(), // Прошедшие брони
+        workspaceApi.getBookingHistory(),
         workspaceApi.getMainWorkspace()
       ]);
 
       const workspaces = wsRes.status === 'fulfilled' ? wsRes.value : [];
-      const allActiveBookings = bookRes.status === 'fulfilled' ? bookRes.value : [];
-      const historyBookings = histRes.status === 'fulfilled' ? histRes.value : [];
+      const allActive = bookRes.status === 'fulfilled' ? bookRes.value : [];
+      const historyRes = histRes.status === 'fulfilled' ? histRes.value : [];
       
-      // Объединяем активные брони и историю в один массив для виджетов и боковой панели
-      // Это гарантирует, что BookingWidgets увидит бронирование сразу после создания
-      const combinedHistory = [...allActiveBookings, ...historyBookings];
-
-      // Убираем возможные дубликаты по ID (если бэкенд отдает одну и ту же бронь в обоих списках)
-      const uniqueHistory = Array.from(
-        new Map(combinedHistory.map(item => [item.id, item])).values()
-      );
+      // Объединяем для виджетов
+      const combinedHistory = [...allActive, ...historyRes];
+      const uniqueHistory = Array.from(new Map(combinedHistory.map(item => [item.id, item])).values());
 
       const enrichedPlaces = workspaces.map(ws => ({
         ...ws,
         key: ws.id,
-        activeBookings: allActiveBookings.filter(b => b.workspace_id === ws.id),
+        activeBookings: allActive.filter(b => b.workspace_id === ws.id),
         status: ws.is_assigned ? 'assigned' : 'available'
       }));
 
       setPlaces(enrichedPlaces);
       setUserStats({
-        history: uniqueHistory, // Теперь здесь есть и будущие, и прошлые записи
+        history: uniqueHistory,
         favoritePlace: favRes.status === 'fulfilled' ? favRes.value : null,
         mainPlace: mainRes.status === 'fulfilled' ? mainRes.value : null,
         isVkConnected: !!localStorage.getItem('vk_connected')
       });
     } catch (err) {
-      console.error(err);
       message.error("Ошибка синхронизации данных");
     } finally {
       setLoading(false);
     }
   }, []);
-  
+
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Важный фикс: handleCancel теперь прокидывается в виджеты
   const handleCancel = async (bookingId) => {
     try {
       await workspaceApi.deleteBooking(bookingId);
       message.success("Бронирование удалено");
-      // Сразу вызываем обновление данных, чтобы виджет пересчитал "Ближайшую бронь"
       await loadData(true); 
     } catch (e) {
-      message.error("Не удалось удалить бронирование");
+      message.error("Не удалось удалить");
     }
   };
 
@@ -146,6 +141,7 @@ const Dashboard = () => {
       return true;
     }).map(place => ({
       ...place,
+      // Считаем слоты именно для даты из фильтра
       freeSlots: calculateFreeSlots(place.activeBookings, targetDate)
     }));
   }, [places, filters, calculateFreeSlots]);
@@ -154,21 +150,15 @@ const Dashboard = () => {
     <Layout style={{ minHeight: '100vh', background: '#000' }}>
       <Content style={{ padding: '24px' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '100px' }}>
-            <Spin size="large" tip="Загрузка коворкинга..." />
-          </div>
+          <div style={{ textAlign: 'center', padding: '100px' }}><Spin size="large" /></div>
         ) : (
           <>
-            {/* Виджеты получают актуальные данные и функцию удаления */}
             <BookingWidgets 
               userStats={userStats} 
               places={places} 
               filters={filters}
               onCancelBooking={handleCancel} 
-              onSelectPlace={(place) => { 
-                setSelectedPlace(place); 
-                setIsModalOpen(true); 
-              }} 
+              onSelectPlace={(place) => { setSelectedPlace(place); setIsModalOpen(true); }} 
             />
             
             <div style={{ marginBottom: 24 }}>
@@ -189,13 +179,11 @@ const Dashboard = () => {
                   }}
                 />
               </Col>
-              
               <Col xs={24} lg={8}>
                 {!userStats.isVkConnected && (
                   <VKWidget onConnectSuccess={() => {
                     localStorage.setItem('vk_connected', 'true');
                     setUserStats(prev => ({ ...prev, isVkConnected: true }));
-                    message.success("VK подключен");
                   }} />
                 )}
                 <HistorySidebar history={userStats.history} />
@@ -211,6 +199,10 @@ const Dashboard = () => {
           initialTimeRange={filters.timeRange}
           onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
           onConfirm={async (vals) => {
+            // Валидация на 2 часа перед отправкой
+            if (vals.end.diff(vals.start, 'minute') < 120) {
+              return message.error('Минимальное время — 2 часа');
+            }
             try {
               await workspaceApi.createBooking({
                 workspace_id: selectedPlace.id,
@@ -219,7 +211,6 @@ const Dashboard = () => {
               });
               message.success('Забронировано');
               setIsModalOpen(false);
-              setSelectedPlace(null);
               loadData(true); 
             } catch (e) { message.error('Время уже занято'); }
           }}
