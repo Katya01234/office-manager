@@ -38,6 +38,8 @@ a:hover {
   background: #fadb14;
   border-radius: 10px;
 }
+
+
 .ant-table {
   background: transparent !important;
 }
@@ -59,4 +61,89 @@ a:hover {
 
 .ant-table-placeholder .ant-empty-description {
   color: #a6a6a6 !important;
+}
+
+/* Эффект подсветки стола при наведении */
+.map-desk-rect {
+  stroke-width: 0;
+  stroke: transparent;
+}
+
+.map-desk-rect:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.2);
+  stroke: #fadb14; /* Мягкое золотое свечение */
+  stroke-width: 2px;
+}
+
+/* Также подсвечиваем текст внутри при наведении */
+g:hover text {
+  fill: #fff !important;
+}
+
+.desk-group:hover .main-rect {
+  fill: #333 !important; /* Легкое высветление при наведении */
+  stroke: #FADB14 !important; /* Желтая рамка */
+}
+
+.desk-group:hover .monitor-led {
+  opacity: 1 !important;
+  filter: url(#goldGlow); /* Эффект свечения */
+}
+
+/* Анимация появления для карты */
+svg {
+  animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.iso-desk {
+  transition: transform 0.3s ease;
+}
+
+.iso-desk:hover {
+  transform: translateY(-5px); /* Стол слегка приподнимается при наведении */
+}
+
+.iso-desk:hover polygon {
+  stroke: #FADB14 !important; /* Желтая обводка всей конструкции */
+  stroke-width: 1.5;
+}
+
+.iso-desk:hover text {
+  fill: #fff;
+  opacity: 1;
+}
+/* Основные стили для изометрии */
+.iso-desk-group {
+  transition: transform 0.3s ease;
+}
+
+.iso-desk-group:hover {
+  transform: translateY(-8px); /* Стол "всплывает" */
+}
+
+.iso-desk-group:hover .iso-surface {
+  stroke: #FADB14 !important;
+  stroke-width: 1.5px;
+  filter: brightness(1.3);
+}
+
+.iso-desk-group:hover text {
+  fill: #fff !important;
+  opacity: 1 !important;
+}
+
+/* Анимация появления всей страницы */
+svg {
+  animation: mapAppear 1s ease-out;
+}
+
+@keyframes mapAppear {
+  from { opacity: 0; filter: blur(10px); }
+  to { opacity: 1; filter: blur(0); }
 }
