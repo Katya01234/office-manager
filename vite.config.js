@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
+  base: '/',
   plugins: [react()],
   
   server: {
@@ -22,18 +23,23 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            // Группируем Ant Design и иконки в один файл
-            if (id.includes('antd') || id.includes('@ant-design')) {
-              return 'vendor-antd';
+            // 1. Оставляем ядро React в основном бандле
+            if (
+              id.includes('react') || 
+              id.includes('react-dom') || 
+              id.includes('react-router') ||
+              id.includes('scheduler') // Добавляем scheduler (нужен для React)
+            ) {
+              return null;
             }
-            // Всё остальное (React, Axios и прочее) — во второй
-            // Это исключит круговые зависимости между мелкими пакетами
-            return 'vendor-core';
+
+            // 2. ВСЕ остальные библиотеки объединяем в ОДИН чанк vendor
+            // Это уберет циклическую зависимость Circular chunk
+            return 'vendor';
           }
         },
       },
     },
-    // Оставляем лимит 1000кб, так как antd — парень тяжелый
-    chunkSizeWarningLimit: 1000, 
+    chunkSizeWarningLimit: 1500, // Немного увеличим лимит, так как теперь чанк один
   },
 })
