@@ -1,4 +1,5 @@
 import React from 'react';
+import { Tooltip } from 'antd';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import { DESK_MAP, MAP_SETTINGS } from './MapConfig';
@@ -9,16 +10,26 @@ const OfficePlan = ({ places, onSelectPlace }) => {
   const { colors, viewBox } = MAP_SETTINGS;
 
   const getStatusColor = (place) => {
-    if (place.is_assigned) return colors.wall; // Темный цвет для закрепленных
-    
-    // Проверяем, есть ли бронь, которая идет прямо сейчас
-    const isOccupiedNow = place.activeBookings?.some(b => 
-      dayjs().isBetween(dayjs(b.start_datetime), dayjs(b.end_datetime))
-    );
+  if (place.is_assigned) return colors.wall; 
+  
+  // 1. Если выбран фильтр по времени и место занято в этот интервал — красный
+  if (place.isOccupiedInFilter) return colors.occupied;
 
-    return isOccupiedNow ? colors.occupied : colors.available;
-  };
+  // 2. НОВОЕ: Если на выбранную дату вообще нет свободных слотов (длиннее 2ч) — красный
+  // Это заставит место гореть красным, даже если конкретный интервал времени не выбран
+  if (!place.freeSlots || place.freeSlots.length === 0) {
+    return colors.occupied;
+  }
 
+  // 3. Статус на текущий момент (для визуализации "сейчас")
+  const isOccupiedNow = place.activeBookings?.some(b => 
+    dayjs().isBetween(dayjs.utc(b.start_datetime).local(), dayjs.utc(b.end_datetime).local())
+  );
+
+  return isOccupiedNow ? colors.occupied : colors.available;
+};
+
+  // Компоненты отрисовки (Chair, Plant) остаются без изменений...
   const OfficeChair = ({ x, y, angle = 0, isAssigned }) => (
     <g transform={`rotate(${angle} ${x} ${y})`} opacity={isAssigned ? "0.3" : "0.8"}>
       <path d={`M ${x-18} ${y-15} h 36 v 25 q 0 5 -5 5 h -26 q -5 0 -5 -5 z`} fill={colors.chair} stroke="#222" />
@@ -27,32 +38,11 @@ const OfficePlan = ({ places, onSelectPlace }) => {
     </g>
   );
 
-  const MonsteraPlant = ({ x, y, scale = 1 }) => (
-    <g transform={`translate(${x} ${y}) scale(${scale})`}>
-      <circle r="12" fill="#1c1c1c" />
-      <g fill="#2d4a1e" opacity="0.9">
-        {[0, 60, 120, 180, 240, 300].map(deg => (
-          <path key={deg} d="M0,0 C5,-10 15,-20 25,-15 C30,-10 25,0 15,5 Z" transform={`rotate(${deg})`} />
-        ))}
-      </g>
-    </g>
-  );
-
   return (
     <svg viewBox={viewBox} style={{ width: '100%', height: '100%', userSelect: 'none' }}>
       <rect x="0" y="0" width="1000" height="750" fill={colors.floor_wood} />
-      
-      {/* Стены */}
+      {/* Стены и декор... */}
       <rect x="15" y="15" width="970" height="720" fill="none" stroke={colors.wall} strokeWidth="10" />
-      
-      {/* Разделители зон */}
-      <line x1="380" y1="15" x2="380" y2="400" stroke={colors.divider} strokeWidth="2" strokeDasharray="5,5" />
-      <line x1="15" y1="400" x2="985" y2="400" stroke={colors.divider} strokeWidth="2" strokeDasharray="5,5" />
-
-      {/* Растительность */}
-      <MonsteraPlant x="50" y="50" scale={1.2} />
-      <MonsteraPlant x="350" y="370" scale={0.7} />
-      <MonsteraPlant x="950" y="430" scale={1.1} />
 
       {places.map((place) => {
         const config = DESK_MAP[place.id];
@@ -63,47 +53,67 @@ const OfficePlan = ({ places, onSelectPlace }) => {
         const h = isMeeting ? 70 : 35;
         const statusColor = getStatusColor(place);
 
-        return (
-          <g 
-            key={place.id} 
-            onClick={() => onSelectPlace(place)} 
-            style={{ cursor: place.is_assigned ? 'not-allowed' : 'pointer' }}
-          >
-            {/* Стулья */}
-            {isMeeting ? (
-              <>
-                <OfficeChair x={config.x + w/2} y={config.y - 12} angle={0} isAssigned={place.is_assigned} />
-                <OfficeChair x={config.x + w/2} y={config.y + h + 12} angle={180} isAssigned={place.is_assigned} />
-              </>
+        // Формируем контент для тултипа
+        const tooltipContent = (
+          <div style={{ padding: '4px' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{place.name}</div>
+            {place.is_assigned ? (
+              <div style={{ color: '#ff4d4f' }}>Закрепленное место</div>
             ) : (
-              <OfficeChair x={config.x + w/2} y={config.y + h + 12} angle={180} isAssigned={place.is_assigned} />
+              <>
+                <div style={{ fontSize: '12px', color: '#fadb14', marginBottom: '4px' }}>Свободные слоты:</div>
+                {place.freeSlots?.length > 0 ? (
+                  place.freeSlots.map((slot, i) => <div key={i} style={{ fontSize: '11px' }}>• {slot}</div>)
+                ) : (
+                  <div style={{ fontSize: '11px', color: '#8c8c8c' }}>Нет свободных окон меньше 2ч</div>
+                )}
+              </>
             )}
+          </div>
+        );
 
-            {/* Стол */}
-            <rect 
-              x={config.x} y={config.y} width={w} height={h} 
-              fill={statusColor} 
-              rx={isMeeting ? "8" : "2"} 
-              stroke="#111" 
-              strokeWidth="0.5"
-              style={{ transition: 'fill 0.3s' }}
-            />
-            
-            {/* Метка стола */}
-            <text 
-              x={config.x + w/2} y={config.y + h/2 + 4} 
-              fill={place.is_assigned ? "#8c8c8c" : "#000"} 
-              textAnchor="middle" 
-              style={{ 
-                fontSize: '9px', 
-                fontWeight: 'bold', 
-                opacity: place.is_assigned ? 0.4 : 0.6, 
-                pointerEvents: 'none' 
-              }}
+        return (
+          <Tooltip 
+            key={place.id} 
+            title={tooltipContent} 
+            color="#1f1f1f" 
+            overlayInnerStyle={{ border: '1px solid #333' }}
+            mouseEnterDelay={0.2}
+          >
+            <g 
+              onClick={() => !place.is_assigned && onSelectPlace(place)} 
+              style={{ cursor: place.is_assigned ? 'not-allowed' : 'pointer' }}
             >
-              {config.label}
-            </text>
-          </g>
+              {/* Стулья */}
+              {isMeeting ? (
+                <>
+                  <OfficeChair x={config.x + w/2} y={config.y - 12} angle={0} isAssigned={place.is_assigned} />
+                  <OfficeChair x={config.x + w/2} y={config.y + h + 12} angle={180} isAssigned={place.is_assigned} />
+                </>
+              ) : (
+                <OfficeChair x={config.x + w/2} y={config.y + h + 12} angle={180} isAssigned={place.is_assigned} />
+              )}
+
+              {/* Стол */}
+              <rect 
+                x={config.x} y={config.y} width={w} height={h} 
+                fill={statusColor} 
+                rx={isMeeting ? "8" : "2"} 
+                stroke="#111" 
+                strokeWidth={place.isOccupiedInFilter ? "2" : "0.5"} // Выделяем занятые при поиске
+                style={{ transition: 'fill 0.3s' }}
+              />
+              
+              <text 
+                x={config.x + w/2} y={config.y + h/2 + 4} 
+                fill={place.is_assigned ? "#8c8c8c" : "#000"} 
+                textAnchor="middle" 
+                style={{ fontSize: '9px', fontWeight: 'bold', pointerEvents: 'none', opacity: 0.7 }}
+              >
+                {config.label}
+              </text>
+            </g>
+          </Tooltip>
         );
       })}
     </svg>

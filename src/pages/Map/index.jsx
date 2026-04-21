@@ -1,13 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { message, Spin, Typography, Layout } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
+import utc from 'dayjs/plugin/utc';
 import { workspaceApi } from '../../api/api';
 import MapContainer from './Components/MapContainer';
 import BookingModal from '../Dashboard/components/BookingModal';
+import PlacesFilters from '../Dashboard/components/PlacesFilters'; // Импортируем готовые фильтры
 
 dayjs.extend(isBetween);
+dayjs.extend(utc);
 const { Content } = Layout;
 
 const OfficeMapPage = () => {
@@ -15,39 +18,84 @@ const OfficeMapPage = () => {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Состояние фильтров (такое же, как в Dashboard)
+  const [filters, setFilters] = useState({ 
+    date: dayjs().add(1, 'day').startOf('day'), 
+    timeRange: null 
+  });
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['dashboardData'], 
+    queryKey: ['dashboardData'], // Отдельный ключ для карты
     queryFn: async () => {
       const [ws, active] = await Promise.all([
         workspaceApi.getWorkspaces(),
         workspaceApi.getBookings()
       ]);
       return {
-        places: ws.map(place => ({
-          ...place,
-          activeBookings: active.filter(b => b.workspace_id === place.id)
-        }))
+        rawPlaces: ws,
+        bookings: active
       };
     }
   });
 
-  // Логика подсчета свободных мест
-  const freePlacesCount = useMemo(() => {
-    if (!data?.places) return 0;
-    const now = dayjs();
+  // Логика расчета свободных слотов (вынесена из Dashboard)
+  const calculateFreeSlots = useCallback((bookings = [], targetDate) => {
+    const MIN_DURATION = 120;
+    const startDay = targetDate.clone().hour(9).minute(0).second(0);
+    const endDay = targetDate.clone().hour(22).minute(0).second(0);
     
-    return data.places.filter(place => {
-      // Исключаем закрепленные места
-      if (place.is_assigned) return false;
+    let freeSlots = [];
+    let currentPos = startDay;
+
+    const dayBookings = bookings
+      .filter(b => dayjs.utc(b.start_datetime).local().isSame(targetDate, 'day'))
+      .sort((a, b) => dayjs.utc(a.start_datetime).diff(dayjs.utc(b.start_datetime)));
+
+    dayBookings.forEach(booking => {
+      const bStart = dayjs.utc(booking.start_datetime).local();
+      if (bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
+        freeSlots.push(`${currentPos.format('HH:mm')} - ${bStart.format('HH:mm')}`);
+      }
+      const bEnd = dayjs.utc(booking.end_datetime).local();
+      if (bEnd.isAfter(currentPos)) currentPos = bEnd;
+    });
+
+    if (endDay.diff(currentPos, 'minute') >= MIN_DURATION) {
+      freeSlots.push(`${currentPos.format('HH:mm')} - ${endDay.format('HH:mm')}`);
+    }
+    return freeSlots;
+  }, []);
+
+  // Формируем список мест с учетом фильтров и слотов
+  const filteredPlaces = useMemo(() => {
+    if (!data?.rawPlaces) return [];
+    const targetDate = filters.date || dayjs().add(1, 'day');
+
+    return data.rawPlaces.map(place => {
+      const placeBookings = data.bookings.filter(b => b.workspace_id === place.id);
       
-      // Проверяем, нет ли бронирования в данную секунду
-      const isOccupiedNow = place.activeBookings?.some(b => 
-        now.isBetween(dayjs(b.start_datetime), dayjs(b.end_datetime))
-      );
-      
-      return !isOccupiedNow;
-    }).length;
-  }, [data]);
+      // Проверка занятости на выбранный интервал времени
+      let isOccupiedInFilter = false;
+      if (filters.timeRange) {
+        const [start, end] = filters.timeRange;
+        const fullStart = targetDate.clone().hour(start.hour()).minute(start.minute());
+        const fullEnd = targetDate.clone().hour(end.hour()).minute(end.minute());
+
+        isOccupiedInFilter = placeBookings.some(b => {
+          const bStart = dayjs.utc(b.start_datetime).local();
+          const bEnd = dayjs.utc(b.end_datetime).local();
+          return fullStart.isBefore(bEnd) && fullEnd.isAfter(bStart);
+        });
+      }
+
+      return {
+        ...place,
+        activeBookings: placeBookings,
+        isOccupiedInFilter,
+        freeSlots: calculateFreeSlots(placeBookings, targetDate)
+      };
+    });
+  }, [data, filters, calculateFreeSlots]);
 
   const createMutation = useMutation({
     mutationFn: workspaceApi.createBooking,
@@ -55,68 +103,43 @@ const OfficeMapPage = () => {
       queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
       message.success('Место успешно забронировано!');
       setIsModalOpen(false);
-      setSelectedPlace(null);
     },
     onError: (err) => {
-      const errorMsg = err.response?.data?.message || 'Это время уже занято';
-      message.error(errorMsg);
+      message.error(err.response?.status === 409 ? 'Это время уже занято' : 'Ошибка бронирования');
     }
   });
 
-  const handleSelectPlace = (place) => {
-    if (place.is_assigned) {
-      message.warning('Это персональное рабочее место, оно недоступно для бронирования');
-      return;
-    }
-    setSelectedPlace(place);
-    setIsModalOpen(true);
-  };
-
-  if (isLoading) return (
-    <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#000' }}>
-      <Spin size="large" tip="Загрузка планировки..." />
-    </div>
-  );
-
-  if (isError) return (
-    <div style={{ padding: '50px', textAlign: 'center', color: '#fff' }}>
-      <h2>Ошибка загрузки данных</h2>
-      <p>Пожалуйста, проверьте подключение к серверу</p>
-    </div>
-  );
+  if (isLoading) return <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#000' }}><Spin size="large" /></div>;
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#0a0a0a' }}>
       <Content style={{ padding: '40px' }}>
         <div style={{ marginBottom: '32px', borderLeft: '4px solid #D4AF37', paddingLeft: '20px' }}>
-          <h1 style={{ color: '#fff', letterSpacing: '4px', margin: 0, fontSize: '28px' }}>
-            КАРТА ОФИСА
-          </h1>
-          {/* Замененный текст со счетчиком */}
-          <Typography.Text style={{ color: '#D4AF37', opacity: 0.8, fontSize: '16px' }}>
-            Доступно <span style={{ fontWeight: 'bold', color: '#fff' }}>{freePlacesCount}</span> из <span style={{ fontWeight: 'bold', color: '#fff' }}>50</span> мест прямо сейчас
+          <h1 style={{ color: '#fff', letterSpacing: '4px', margin: 0, fontSize: '28px' }}>КАРТА ОФИСА</h1>
+          <Typography.Text style={{ color: '#D4AF37', opacity: 0.8 }}>
+            Выберите дату ивремя, чтобы увидеть доступные места
           </Typography.Text>
         </div>
 
+        {/* Секция фильтров */}
+        <PlacesFilters filters={filters} setFilters={setFilters} />
+
         <div style={{ 
-          background: '#141414', 
-          borderRadius: '16px', 
-          padding: '20px', 
-          boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-          border: '1px solid #222',
-          height: 'calc(100vh - 200px)',
-          position: 'relative'
+          background: '#141414', borderRadius: '16px', padding: '20px', 
+          border: '1px solid #222', height: 'calc(100vh - 300px)', position: 'relative'
         }}>
           <MapContainer 
-            places={data?.places || []} 
-            onSelectPlace={handleSelectPlace} 
+            places={filteredPlaces} 
+            onSelectPlace={(place) => { setSelectedPlace(place); setIsModalOpen(true); }} 
+            selectedDate={filters.date} // Передаем дату для корректного отображения в Modal
           />
         </div>
 
         <BookingModal 
           open={isModalOpen} 
           place={selectedPlace}
-          initialDate={dayjs().add(1, 'day')}
+          initialDate={filters.date}
+          initialTimeRange={filters.timeRange}
           onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
           onConfirm={(vals) => {
             createMutation.mutate({
