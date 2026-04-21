@@ -1,16 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   
   server: {
-    // Твои настройки для порта 5500
     host: '127.0.0.1',
     port: 5500,
     strictPort: true, 
-    
     proxy: {
       '/api': {
         target: 'http://45.86.183.29:8080',
@@ -19,17 +16,24 @@ export default defineConfig({
       },
     },
   },
+
   build: {
     rollupOptions: {
       output: {
-        // Эта функция разбивает код на части
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            return 'vendor';
+            // Группируем Ant Design и иконки в один файл
+            if (id.includes('antd') || id.includes('@ant-design')) {
+              return 'vendor-antd';
+            }
+            // Всё остальное (React, Axios и прочее) — во второй
+            // Это исключит круговые зависимости между мелкими пакетами
+            return 'vendor-core';
           }
         },
       },
     },
+    // Оставляем лимит 1000кб, так как antd — парень тяжелый
     chunkSizeWarningLimit: 1000, 
   },
 })
