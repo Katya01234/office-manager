@@ -71,7 +71,7 @@ const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId }) => {
     { 
       title: 'Действие', 
       key: 'action',
-      align: 'right',
+      align: 'left',
       render: (_, record) => {
         const noSlots = !record.freeSlots || record.freeSlots.length === 0;
         const canBook = !record.is_assigned && !noSlots;

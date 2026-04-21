@@ -1,16 +1,16 @@
 import React, { useEffect, useRef } from 'react';
 import { Card, Typography, Space, Tag, message } from 'antd';
+import { workspaceApi } from '../../../api/api';
 
 const { Title, Text } = Typography;
 
-const VKWidget = ({ onConnectSuccess }) => { // Принимаем callback
+const VKWidget = ({ onConnectSuccess }) => {
   const authContainerRef = useRef(null);
 
   useEffect(() => {
     const initVKID = () => {
       if (window.VKIDSDK && authContainerRef.current) {
         const VKID = window.VKIDSDK;
-
         authContainerRef.current.innerHTML = '';
 
         VKID.Config.init({
@@ -26,25 +26,27 @@ const VKWidget = ({ onConnectSuccess }) => { // Принимаем callback
           container: authContainerRef.current,
           scheme: 'dark',
           lang: VKID.Languages.RUS,
-          styles: { 
-            height: 38,
-            borderRadius: 8
-          }
+          styles: { height: 38, borderRadius: 8 }
         })
-        .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, (payload) => {
-          VKID.Auth.exchangeCode(payload.code, payload.device_id)
-            .then(() => {
-              message.success("ВК успешно привязан!");
-              // Обязательно вызываем этот callback! 
-              // Он скажет Dashboard.jsx, что пора скрыть этот виджет.
-              if (onConnectSuccess) {
-                onConnectSuccess();
-              }
-            })
-            .catch((err) => {
-              console.error(err);
-              message.error("Ошибка авторизации ВК");
-            });
+        .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, async (payload) => {
+          try {
+            // Обмениваем код на токены через SDK
+            const result = await VKID.Auth.exchangeCode(payload.code, payload.device_id);
+            
+            // ОТПРАВЛЯЕМ token_id на бэкенд (ручка POST me/vk)
+            // Обычно это id_token или access_token из результата exchangeCode
+            await workspaceApi.connectVk(result.id_token || result.access_token);
+            
+            message.success("ВК успешно привязан к аккаунту!");
+            
+            // Коллбэк обновит данные в Dashboard и скроет виджет
+            if (onConnectSuccess) {
+              onConnectSuccess();
+            }
+          } catch (err) {
+            console.error(err);
+            message.error("Ошибка привязки аккаунта ВК");
+          }
         });
       }
     };
@@ -55,7 +57,6 @@ const VKWidget = ({ onConnectSuccess }) => { // Принимаем callback
     } else {
       initVKID();
     }
-    // Добавляем onConnectSuccess в зависимости, чтобы useEffect видел актуальную функцию
   }, [onConnectSuccess]);
 
   return (
@@ -71,16 +72,12 @@ const VKWidget = ({ onConnectSuccess }) => { // Принимаем callback
     >
       <Space direction="vertical" size="small" style={{ width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Space>
-            <Title level={5} style={{ color: '#fff', margin: 0, fontSize: '15px' }}>Уведомления</Title>
-          </Space>
-          <Tag color="blue" style={{ borderRadius: '4px', fontSize: '10px', margin: 0, opacity: 0.8 }}>VK ID</Tag>
+          <Title level={5} style={{ color: '#fff', margin: 0, fontSize: '15px' }}>Уведомления</Title>
+          <Tag color="blue" style={{ borderRadius: '4px', fontSize: '10px', margin: 0 }}>VK ID</Tag>
         </div>
-        
-        <Text style={{ color: '#8c8c8c', fontSize: '12px', lineHeight: '1.4' }}>
+        <Text style={{ color: '#8c8c8c', fontSize: '12px' }}>
           Привяжите аккаунт, чтобы получать уведомления о бронированиях через VK.
         </Text>
-
         <div style={{ 
           background: 'rgba(255, 255, 255, 0.02)', 
           padding: '12px', 

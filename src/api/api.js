@@ -1,6 +1,12 @@
 import api from './index';
 
 export const workspaceApi = {
+
+  connectVk: async (tokenId) => {
+    const response = await api.post('/me/vk', { token_id: tokenId }); 
+    return response.data;
+  },
+
   login: async (login, password) => {
     const response = await api.post('/auth/sign-in', { login, password });
     return response.data;
@@ -58,5 +64,11 @@ export const workspaceApi = {
   deleteBooking: async (id) => {
     await api.delete(`/bookings/${id}`);
     return true;
+  },
+
+    getMe: async () => {
+    const response = await api.get('/me');
+    return response.data;
   }
+
 };
