@@ -55,15 +55,34 @@ const OfficePlan = ({ places, onSelectPlace }) => {
 
         // Формируем контент для тултипа
         const tooltipContent = (
-          <div style={{ padding: '4px' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{place.name}</div>
+          <div style={{ padding: '4px', maxWidth: '200px' }}>
+            {/* Название и Тип места */}
+            <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '2px' }}>
+              {place.name}
+            </div>
+            <div style={{ color: '#D4AF37', fontSize: '11px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              {place.name?.startsWith('П') ? 'Переговорная' : 'Рабочее место'}
+            </div>
+
+            {/* Описание с бэкенда (если оно есть) */}
+            {place.description && (
+              <div style={{ fontSize: '12px', color: '#ccc', marginBottom: '8px', fontStyle: 'italic' }}>
+                {place.info}
+              </div>
+            )}
+
+            {/* Статус и Слоты */}
             {place.is_assigned ? (
-              <div style={{ color: '#ff4d4f' }}>Закрепленное место</div>
+              <div style={{ color: '#ff4d4f', fontWeight: '500' }}>Закрепленное место</div>
             ) : (
               <>
-                <div style={{ fontSize: '12px', color: '#fadb14', marginBottom: '4px' }}>Свободные слоты:</div>
+                <div style={{ fontSize: '12px', color: '#fadb14', marginBottom: '4px', borderTop: '1px solid #333', paddingTop: '4px' }}>
+                  Свободные слоты:
+                </div>
                 {place.freeSlots?.length > 0 ? (
-                  place.freeSlots.map((slot, i) => <div key={i} style={{ fontSize: '11px' }}>• {slot}</div>)
+                  place.freeSlots.map((slot, i) => (
+                    <div key={i} style={{ fontSize: '11px', color: '#fff' }}>• {slot}</div>
+                  ))
                 ) : (
                   <div style={{ fontSize: '11px', color: '#8c8c8c' }}>Нет свободных окон меньше 2ч</div>
                 )}
@@ -110,7 +129,7 @@ const OfficePlan = ({ places, onSelectPlace }) => {
                 textAnchor="middle" 
                 style={{ fontSize: '9px', fontWeight: 'bold', pointerEvents: 'none', opacity: 0.7 }}
               >
-                {config.label}
+                {place.name}
               </text>
             </g>
           </Tooltip>
