@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Card, Typography, Tag, Empty, Space, Button, Divider } from 'antd';
+import { Card, Typography, Tag, Empty, Space, Button } from 'antd';
 import { 
   HistoryOutlined, 
   CalendarOutlined, 
@@ -9,31 +9,31 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
+import utc from 'dayjs/plugin/utc';
 
+dayjs.extend(utc);
 dayjs.locale('ru');
 
 const { Text } = Typography;
 
 const HistorySidebar = ({ history, onCancelBooking }) => {
-  // Разделяем данные на активные/будущие и завершенные
   const { activeBookings, pastHistory } = useMemo(() => {
     const all = history || [];
     const now = dayjs();
     
     return {
       activeBookings: all
-        .filter(item => dayjs(item.end_datetime).isAfter(now))
-        .sort((a, b) => dayjs(a.start_datetime).diff(dayjs(b.start_datetime))),
+        .filter(item => dayjs.utc(item.end_datetime).local().isAfter(now))
+        .sort((a, b) => dayjs.utc(a.start_datetime).diff(dayjs.utc(b.start_datetime))),
       pastHistory: all
-        .filter(item => dayjs(item.end_datetime).isBefore(now))
-        .sort((a, b) => dayjs(b.start_datetime).diff(dayjs(a.start_datetime)))
+        .filter(item => dayjs.utc(item.end_datetime).local().isBefore(now))
+        .sort((a, b) => dayjs.utc(b.start_datetime).diff(dayjs.utc(a.start_datetime)))
     };
   }, [history]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
-      {/* СЕКЦИЯ 1: АКТИВНЫЕ БРОНИ */}
       <Card 
         title={<span style={{ color: '#fadb14' }}><RocketOutlined /> Предстоящие сессии</span>}
         style={{ background: '#141414', borderColor: '#333', borderRadius: '12px' }}
@@ -54,7 +54,8 @@ const HistorySidebar = ({ history, onCancelBooking }) => {
               </div>
               <div style={{ marginTop: 4 }}>
                 <Text type="secondary" style={{ fontSize: '12px' }}>
-                  <CalendarOutlined /> {dayjs(item.start_datetime).format('DD MMM')} | {dayjs(item.start_datetime).format('HH:mm')} - {dayjs(item.end_datetime).format('HH:mm')}
+                  {/* ИСПРАВЛЕНО: Форматирование интервала */}
+                  <CalendarOutlined /> {dayjs.utc(item.start_datetime).local().format('DD.MM')} | {dayjs.utc(item.start_datetime).local().format('HH:mm')} - {dayjs.utc(item.end_datetime).local().format('HH:mm')}
                 </Text>
               </div>
             </div>
@@ -64,7 +65,6 @@ const HistorySidebar = ({ history, onCancelBooking }) => {
         )}
       </Card>
 
-      {/* СЕКЦИЯ 2: ИСТОРИЯ */}
       <Card 
         title={<span style={{ color: '#fff' }}><HistoryOutlined /> История посещений</span>} 
         style={{ background: '#141414', borderColor: '#333', borderRadius: '12px' }}
@@ -78,12 +78,12 @@ const HistorySidebar = ({ history, onCancelBooking }) => {
               </Text>
               
               <Space direction="vertical" size={0} style={{ marginTop: 4 }}>
-                <Text type="secondary" style={{ fontSize: '12px', textTransform: 'capitalize' }}>
-                  <CalendarOutlined style={{ marginRight: 4 }} />
-                  {dayjs(item.start_datetime).format('DD MMMM')}
+                <Text style={{ fontSize: '11px', color: '#595959' }}>
+                  <CalendarOutlined /> {dayjs.utc(item.start_datetime).local().format('D MMMM YYYY')}
                 </Text>
                 <Text style={{ fontSize: '11px', color: '#595959' }}>
-                  <ClockCircleOutlined style={{ fontSize: '10px' }} /> {dayjs(item.start_datetime).format('HH:mm')} — {dayjs(item.end_datetime).format('HH:mm')}
+                  {/* ИСПРАВЛЕНО: Конец интервала b.end_datetime */}
+                  <ClockCircleOutlined style={{ fontSize: '10px' }} /> {dayjs.utc(item.start_datetime).local().format('HH:mm')} — {dayjs.utc(item.end_datetime).local().format('HH:mm')}
                 </Text>
               </Space>
             </div>

@@ -10,7 +10,9 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
+import utc from 'dayjs/plugin/utc';
 
+dayjs.extend(utc);
 dayjs.extend(isBetween);
 
 const { Title, Text } = Typography;
@@ -25,13 +27,15 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
 
   const targetDate = filters?.date || dayjs().add(1, 'day');
   
-  // 1. Логика поиска активных/будущих броней пользователя
   const { currentActive, nextBooking } = useMemo(() => {
     const history = userStats?.history || [];
-    const active = history.find(b => now.isBetween(dayjs(b.start_datetime), dayjs(b.end_datetime)));
+    // ИСПРАВЛЕНО: Парсим как UTC и сравниваем с локальным now
+    const active = history.find(b => 
+      now.isBetween(dayjs.utc(b.start_datetime).local(), dayjs.utc(b.end_datetime).local())
+    );
     const future = history
-      .filter(b => dayjs(b.start_datetime).isAfter(now))
-      .sort((a, b) => dayjs(a.start_datetime).valueOf() - dayjs(b.start_datetime).valueOf())[0];
+      .filter(b => dayjs.utc(b.start_datetime).local().isAfter(now))
+      .sort((a, b) => dayjs.utc(a.start_datetime).valueOf() - dayjs.utc(b.start_datetime).valueOf())[0];
 
     return { currentActive: active, nextBooking: future };
   }, [userStats?.history, now]);
@@ -39,7 +43,6 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
   const displayBooking = currentActive || nextBooking;
   const isActiveNow = !!currentActive;
 
-  // 2. Логика для любимого места
   const favoriteFullData = places?.find(p => p.id === userStats?.favoritePlace?.id);
 
   const favoriteSlots = useMemo(() => {
@@ -49,15 +52,15 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
     const endDay = targetDate.clone().hour(22).minute(0).second(0);
     
     const dayBookings = (favoriteFullData.activeBookings || [])
-      .filter(b => dayjs(b.start_datetime).isSame(targetDate, 'day'))
-      .sort((a, b) => dayjs(a.start_datetime).diff(dayjs(b.start_datetime)));
+      .filter(b => dayjs.utc(b.start_datetime).local().isSame(targetDate, 'day'))
+      .sort((a, b) => dayjs.utc(a.start_datetime).diff(dayjs.utc(b.start_datetime)));
 
     let freeSlots = [];
     let currentPos = startDay;
 
     dayBookings.forEach(booking => {
-      const bStart = dayjs(booking.start_datetime);
-      const bEnd = dayjs(booking.end_datetime);
+      const bStart = dayjs.utc(booking.start_datetime).local();
+      const bEnd = dayjs.utc(booking.end_datetime).local();
       if (bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
         freeSlots.push(`${currentPos.format('HH:mm')} - ${bStart.format('HH:mm')}`);
       }
@@ -74,7 +77,6 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
 
   return (
     <div style={{ marginBottom: 32 }}>
-      {/* МИНИ-НАПОМИНАНИЕ О ЗАКРЕПЛЕННОМ МЕСТЕ (вместо огромного виджета) */}
       {userStats?.mainPlace && (
         <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center' }}>
           <Tag 
@@ -94,7 +96,6 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
       )}
 
       <Row gutter={[16, 16]}>
-        {/* 1. Любимое место (теперь занимает половину ширины) */}
         <Col xs={24} md={12}>
           <Card 
             bordered={false} 
@@ -145,7 +146,6 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
           </Card>
         </Col>
 
-        {/* 2. Динамический виджет брони (теперь занимает вторую половину) */}
         <Col xs={24} md={12}>
           <Card 
             bordered={false} 
@@ -163,7 +163,6 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
                   {isActiveNow ? <CheckCircleOutlined /> : <ClockCircleOutlined />} 
                   {isActiveNow ? ' ТЕКУЩЕЕ МЕСТО' : (displayBooking ? ' СКОРО' : ' НЕТ БРОНЕЙ')}
                 </Text>
-                {displayBooking && !isActiveNow && <Tag color="gold">План</Tag>}
               </div>
               
               {displayBooking ? (
@@ -173,9 +172,10 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
                       {displayBooking.workspace_name || `Место #${displayBooking.workspace_id}`}
                     </Title>
                     <Text style={{ color: isActiveNow ? '#000' : '#8c8c8c', fontSize: '13px' }}>
-                      {!dayjs(displayBooking.start_datetime).isSame(dayjs(), 'day') && 
-                        dayjs(displayBooking.start_datetime).format('DD.MM ')}
-                      {dayjs(displayBooking.start_datetime).format('HH:mm')} — {dayjs(displayBooking.end_datetime).format('HH:mm')}
+                      {/* ИСПРАВЛЕНО: Корректный вывод даты и времени из UTC */}
+                      {!dayjs.utc(displayBooking.start_datetime).local().isSame(dayjs(), 'day') && 
+                        dayjs.utc(displayBooking.start_datetime).local().format('DD.MM ')}
+                      {dayjs.utc(displayBooking.start_datetime).local().format('HH:mm')} — {dayjs.utc(displayBooking.end_datetime).local().format('HH:mm')}
                     </Text>
                   </div>
                   

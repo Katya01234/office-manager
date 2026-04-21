@@ -3,6 +3,8 @@ import { Row, Col, message, Spin, Layout } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import { workspaceApi } from '../../api/api';
 
 import BookingWidgets from "./components/BookingWidgets.jsx";
@@ -13,6 +15,9 @@ import HistorySidebar from "./components/HistorySidebar.jsx";
 import VKWidget from "./components/VKWidget.jsx";
 
 dayjs.extend(isBetween);
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 const { Content } = Layout;
 
 const Dashboard = () => {
@@ -26,7 +31,6 @@ const Dashboard = () => {
     timeRange: null 
   });
 
-  // ОСНОВНОЙ ЗАПРОС С КЕШИРОВАНИЕМ
   const { data, isLoading, isError } = useQuery({
     queryKey: ['dashboardData'],
     queryFn: async () => {
@@ -58,7 +62,6 @@ const Dashboard = () => {
     }
   });
 
-  // МУТАЦИЯ УДАЛЕНИЯ
   const cancelMutation = useMutation({
     mutationFn: workspaceApi.deleteBooking,
     onSuccess: () => {
@@ -68,7 +71,6 @@ const Dashboard = () => {
     onError: () => message.error("Не удалось удалить")
   });
 
-  // МУТАЦИЯ СОЗДАНИЯ
   const createMutation = useMutation({
     mutationFn: workspaceApi.createBooking,
     onSuccess: () => {
@@ -76,7 +78,10 @@ const Dashboard = () => {
       message.success('Забронировано');
       setIsModalOpen(false);
     },
-    onError: () => message.error('Время уже занято')
+    onError: (err) => {
+      // Выводим конкретную ошибку из сваггера, если она есть
+      message.error(err.response?.status === 409 ? 'Это время уже занято' : 'Ошибка бронирования');
+    }
   });
 
   const calculateFreeSlots = useCallback((bookings = [], targetDate) => {
@@ -88,15 +93,15 @@ const Dashboard = () => {
     let currentPos = startDay;
 
     const dayBookings = bookings
-      .filter(b => dayjs(b.start_datetime).isSame(targetDate, 'day'))
-      .sort((a, b) => dayjs(a.start_datetime).diff(dayjs(b.start_datetime)));
+      .filter(b => dayjs.utc(b.start_datetime).local().isSame(targetDate, 'day'))
+      .sort((a, b) => dayjs.utc(a.start_datetime).diff(dayjs.utc(b.start_datetime)));
 
     dayBookings.forEach(booking => {
-      const bStart = dayjs(booking.start_datetime);
+      const bStart = dayjs.utc(booking.start_datetime).local();
       if (bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
         freeSlots.push(`${currentPos.format('HH:mm')} - ${bStart.format('HH:mm')}`);
       }
-      const bEnd = dayjs(booking.end_datetime);
+      const bEnd = dayjs.utc(booking.end_datetime).local();
       if (bEnd.isAfter(currentPos)) currentPos = bEnd;
     });
 
@@ -111,19 +116,24 @@ const Dashboard = () => {
     const targetDate = filters.date || dayjs().add(1, 'day');
     
     return data.places.filter(place => {
+      // Проверка "Свободно сейчас"
       if (filters.onlyFree) {
+        const now = dayjs();
         const isOccupiedNow = place.activeBookings.some(b => 
-          dayjs().isBetween(dayjs(b.start_datetime), dayjs(b.end_datetime))
+          now.isBetween(dayjs.utc(b.start_datetime).local(), dayjs.utc(b.end_datetime).local())
         );
         if (isOccupiedNow) return false;
       }
+
+      // Проверка пересечения с выбранным фильтром времени
       if (filters.timeRange) {
         const [start, end] = filters.timeRange;
         const fullStart = targetDate.clone().hour(start.hour()).minute(start.minute());
         const fullEnd = targetDate.clone().hour(end.hour()).minute(end.minute());
+
         const isOccupied = place.activeBookings.some(b => {
-          const bStart = dayjs(b.start_datetime);
-          const bEnd = dayjs(b.end_datetime);
+          const bStart = dayjs.utc(b.start_datetime).local();
+          const bEnd = dayjs.utc(b.end_datetime).local();
           return fullStart.isBefore(bEnd) && fullEnd.isAfter(bStart);
         });
         if (isOccupied) return false;
@@ -189,6 +199,7 @@ const Dashboard = () => {
             if (vals.end.diff(vals.start, 'minute') < 120) {
               return message.error('Минимальное время — 2 часа');
             }
+            // ИСПРАВЛЕНО: Приведение к ISO UTC для Swagger
             createMutation.mutate({
               workspace_id: selectedPlace.id,
               start_datetime: vals.start.toISOString(),
