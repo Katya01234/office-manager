@@ -2,7 +2,8 @@ import React from 'react';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import OfficePlan from './OfficePlan';
 
-const MapContainer = ({ places, onSelectPlace }) => {
+// 1. Добавляем userStats в деструктуризацию пропсов
+const MapContainer = ({ places, onSelectPlace, userStats }) => {
   return (
     <div style={{ 
       background: '#0a0a0a', 
@@ -13,21 +14,18 @@ const MapContainer = ({ places, onSelectPlace }) => {
       border: '1px solid #222'
     }}>
       <TransformWrapper
-        // Увеличиваем начальный масштаб, чтобы карта не была маленькой при загрузке
         initialScale={1.2} 
         centerOnInit={true}
         minScale={0.4}
         maxScale={4}
-        // Настройки для максимально плавного и медленного зума
         wheel={{ 
-          step: 0.02,          // Еще сильнее уменьшили шаг (был 0.05)
-          smoothStep: true,    // Плавный переход между шагами
+          step: 0.02,
+          smoothStep: true,
           velocityDisabled: false 
         }}
-        // Настройка инерции и анимации
         zoomAnimation={{
-          size: 3,             // Количество кадров анимации (больше — плавнее)
-          animationTime: 300,  // Длительность анимации в мс
+          size: 3,
+          animationTime: 300,
           animationType: 'easeOut'
         }}
         doubleClick={{
@@ -47,9 +45,13 @@ const MapContainer = ({ places, onSelectPlace }) => {
             background: '#0a0a0a'
           }}
         >
-          {/* Убедитесь, что размеры здесь совпадают с viewBox в OfficePlan */}
           <div style={{ width: '850px', height: '650px' }}>
-            <OfficePlan places={places} onSelectPlace={onSelectPlace} />
+            {/* 2. Пробрасываем userStats в OfficePlan */}
+            <OfficePlan 
+              places={places} 
+              onSelectPlace={onSelectPlace} 
+              userStats={userStats} 
+            />
           </div>
         </TransformComponent>
       </TransformWrapper>

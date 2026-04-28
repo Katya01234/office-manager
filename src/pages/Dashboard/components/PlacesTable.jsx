@@ -3,80 +3,84 @@ import { Table, Tag, Button, Space, Typography, Tooltip } from 'antd';
 import { 
   HeartFilled, HeartOutlined, LockOutlined, 
   DesktopOutlined, CloudOutlined, ClockCircleOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined, PushpinFilled
 } from '@ant-design/icons';
 
 const { Text } = Typography;
 
-const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId }) => {
+const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId, mainPlaceId }) => {
   const columns = [
     { 
       title: 'Место', 
       dataIndex: 'name', 
       key: 'name',
       width: '30%',
-      render: (name, record) => (
-        <Space>
-          <Tooltip 
-            color="#1f1f1f"
-            placement="right"
-            title={
-              <div>
-                <div style={{ marginBottom: '4px', borderBottom: '1px solid #434343', paddingBottom: '4px' }}>
-                  <ClockCircleOutlined /> Окна (от 2-х часов):
+      render: (name, record) => {
+        const isMain = mainPlaceId === record.id;
+        const isFav = favoritePlaceId === record.id;
+
+        return (
+          <Space>
+            <Tooltip 
+              color="#1f1f1f"
+              placement="right"
+              title={
+                <div>
+                  <div style={{ marginBottom: '4px', borderBottom: '1px solid #434343', paddingBottom: '4px' }}>
+                    <ClockCircleOutlined /> Окна (от 2-х часов):
+                  </div>
+                  {record.freeSlots && record.freeSlots.length > 0 ? (
+                    record.freeSlots.map((slot, i) => (
+                      <div key={i} style={{ color: '#fadb14' }}>• {slot}</div>
+                    ))
+                  ) : (
+                    <div style={{ color: '#ff4d4f' }}>Нет свободных окон</div>
+                  )}
                 </div>
-                {record.freeSlots && record.freeSlots.length > 0 ? (
-                  record.freeSlots.map((slot, i) => (
-                    <div key={i} style={{ color: '#fadb14' }}>• {slot}</div>
-                  ))
-                ) : (
-                  <div style={{ color: '#ff4d4f' }}>Нет свободных окон</div>
-                )}
-              </div>
-            }
-          >
-            <Text strong style={{ color: '#fadb14', cursor: 'help', borderBottom: '1px dashed #fadb14' }}>
-              {name || `Место #${record.id}`}
-            </Text>
-          </Tooltip>
-          
-          <div 
-            onClick={(e) => { e.stopPropagation(); onToggleFavorite(record.id); }} 
-            style={{ cursor: 'pointer', padding: '0 8px' }}
-          >
-            {favoritePlaceId === record.id ? <HeartFilled style={{ color: '#ff4d4f' }} /> : <HeartOutlined style={{ color: '#555' }} />}
-          </div>
-          
-          {record.is_assigned && (
-            <Tag color="#262626" style={{ border: 'none' }}><LockOutlined /></Tag>
-          )}
-        </Space>
-      )
+              }
+            >
+              <Text strong style={{ color: isMain ? '#1677ff' : '#fadb14', cursor: 'help', borderBottom: '1px dashed' }}>
+                {name || `Место #${record.id}`}
+              </Text>
+            </Tooltip>
+            
+            <div 
+              onClick={(e) => { e.stopPropagation(); onToggleFavorite(record.id); }} 
+              style={{ cursor: 'pointer', padding: '0 4px' }}
+            >
+              {isFav ? <HeartFilled style={{ color: '#ff4d4f' }} /> : <HeartOutlined style={{ color: '#555' }} />}
+            </div>
+            
+            {isMain && (
+              <Tooltip title="Ваше постоянное место">
+                <PushpinFilled style={{ color: '#1677ff' }} />
+              </Tooltip>
+            )}
+
+            {record.is_assigned && !isMain && (
+              <Tag color="#262626" style={{ border: 'none' }}><LockOutlined /></Tag>
+            )}
+          </Space>
+        );
+      }
     },
     { 
-      title: 'Тип и Оснащение', // Переименовали для ясности
+      title: 'Тип и Оснащение', 
       dataIndex: 'description', 
       key: 'description',
       render: (text, record) => {
-        // ИСПРАВЛЕНО: Логика определения типа места
         const isMeeting = record.name?.startsWith('П');
-        
         return (
           <Space direction="vertical" size={0}>
-            {/* Вывод типа места вместо "Стандарта" */}
             <Text style={{ 
               color: isMeeting ? '#D4AF37' : '#d9d9d9', 
               fontSize: '12px', 
               fontWeight: isMeeting ? 'bold' : 'normal',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
+              textTransform: 'uppercase'
             }}>
               {isMeeting ? 'Переговорная' : 'Рабочее место'}
             </Text>
-            
-            {/* Дополнительное описание (если есть) */}
             {text && <Text style={{ color: '#595959', fontSize: '11px' }}>{text}</Text>}
-            
             <Space style={{ fontSize: '16px', marginTop: '4px' }}>
                {record.equipment?.some(e => e.toLowerCase().includes('монитор')) && <DesktopOutlined style={{ color: '#1677ff' }} />}
                {record.description?.toLowerCase().includes('окно') && <CloudOutlined style={{ color: '#8c8c8c' }} />}
@@ -89,11 +93,13 @@ const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId }) => {
     { 
       title: 'Действие', 
       key: 'action',
-      align: 'left',
       render: (_, record) => {
+        const isMain = mainPlaceId === record.id;
         const noSlots = !record.freeSlots || record.freeSlots.length === 0;
         const canBook = !record.is_assigned && !noSlots;
         
+        if (isMain) return <Tag color="blue">ВАШЕ МЕСТО</Tag>;
+
         return (
           <Button 
             type="primary" 
@@ -125,8 +131,6 @@ const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId }) => {
         .custom-dark-table .ant-table-thead > tr > th { background: #1d1d1d !important; color: #8c8c8c !important; border-bottom: 1px solid #333 !important; }
         .custom-dark-table .ant-table-tbody > tr > td { border-bottom: 1px solid #262626 !important; }
         .custom-dark-table .ant-table-tbody > tr:hover > td { background: #1f1f1f !important; }
-        /* Стили для пагинации */
-        .custom-dark-table .ant-pagination-item a { color: #8c8c8c !important; }
         .custom-dark-table .ant-pagination-item-active { border-color: #fadb14 !important; background: transparent !important; }
         .custom-dark-table .ant-pagination-item-active a { color: #fadb14 !important; }
       `}</style>

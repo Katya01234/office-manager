@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import utc from 'dayjs/plugin/utc';
-import { workspaceApi } from '../../api/api';
+import { workspaceApi } from '../../api/api'; 
 import MapContainer from './Components/MapContainer';
 import BookingModal from '../Dashboard/components/BookingModal';
 import PlacesFilters from '../Dashboard/components/PlacesFilters';
@@ -21,17 +21,28 @@ const OfficeMapPage = () => {
   const [filters, setFilters] = useState({ 
     date: dayjs().add(1, 'day').startOf('day'), 
     timeRange: null,
-    type: 'all' // Добавляем тип в фильтры для синхронизации
+    type: 'all' 
   });
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['mapData'], 
+  const { data, isLoading } = useQuery({
+    queryKey: ['mapData', filters.date.format('YYYY-MM-DD')], 
     queryFn: async () => {
-      const [ws, active] = await Promise.all([
+      // Используем ту же логику запросов, что и в Dashboard
+      const [ws, active, fav, main] = await Promise.all([
         workspaceApi.getWorkspaces(),
-        workspaceApi.getBookings()
+        workspaceApi.getBookings(),
+        workspaceApi.getFavorite(),    
+        workspaceApi.getMainWorkspace() 
       ]);
-      return { rawPlaces: ws, bookings: active };
+      
+      return { 
+        rawPlaces: ws, 
+        bookings: active, 
+        userStats: {
+          favoritePlace: fav,
+          mainPlace: main
+        } 
+      };
     },
     refetchOnMount: true,
     staleTime: 0 
@@ -79,7 +90,6 @@ const OfficeMapPage = () => {
     const targetDate = filters.date || dayjs().add(1, 'day');
 
     return data.rawPlaces.filter(place => {
-      // Фильтрация по типу для карты
       if (filters.type && filters.type !== 'all') {
         const isMeeting = place.name?.startsWith('П');
         if (filters.type === 'meeting' && !isMeeting) return false;
@@ -123,7 +133,11 @@ const OfficeMapPage = () => {
     }
   });
 
-  if (isLoading) return <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0a0a0a' }}><Spin size="large" /></div>;
+  if (isLoading) return (
+    <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0a0a0a' }}>
+      <Spin size="large" />
+    </div>
+  );
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#0a0a0a' }}>
@@ -140,6 +154,7 @@ const OfficeMapPage = () => {
             places={filteredPlaces} 
             onSelectPlace={(place) => { setSelectedPlace(place); setIsModalOpen(true); }} 
             selectedDate={filters.date}
+            userStats={data?.userStats} 
           />
         </div>
 
@@ -157,15 +172,12 @@ const OfficeMapPage = () => {
             }
             onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
             onConfirm={(vals) => {
-              // 1. Проверка на 2 часа
               if (vals.end.diff(vals.start, 'minute') < 120) {
                 return message.error('Минимальное время — 2 часа');
               }
 
-              // 2. ЛОГИКА ЗАПРЕТА: Одно рабочее место в день
               const isMeetingRoom = selectedPlace?.name?.startsWith('П');
               if (!isMeetingRoom) {
-                // Проверяем наличие существующих броней рабочего места на выбранную дату
                 const hasExistingDesk = data?.bookings?.some(b => {
                   const isSameDay = dayjs.utc(b.start_datetime).local().isSame(vals.start, 'day');
                   const placeDetails = data?.rawPlaces?.find(p => p.id === b.workspace_id);
@@ -174,7 +186,7 @@ const OfficeMapPage = () => {
                 });
 
                 if (hasExistingDesk) {
-                  return message.error('Вы уже забронировали рабочее место на этот день. Можно забронировать только переговорную.');
+                  return message.error('Вы уже забронировали рабочее место на этот день.');
                 }
               }
 
