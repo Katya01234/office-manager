@@ -54,19 +54,37 @@ const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId }) => {
       )
     },
     { 
-      title: 'Характеристики', 
+      title: 'Тип и Оснащение', // Переименовали для ясности
       dataIndex: 'description', 
       key: 'description',
-      render: (text, record) => (
-        <Space direction="vertical" size={0}>
-          <Text style={{ color: '#d9d9d9', fontSize: '13px' }}>{text || "Стандарт"}</Text>
-          <Space style={{ fontSize: '16px', marginTop: '6px' }}>
-             {record.equipment?.some(e => e.toLowerCase().includes('монитор')) && <DesktopOutlined style={{ color: '#1677ff' }} />}
-             {record.description?.toLowerCase().includes('окно') && <CloudOutlined style={{ color: '#8c8c8c' }} />}
-             <Tooltip title="Розетки 220V"><InfoCircleOutlined style={{ color: '#52c41a', fontSize: '12px' }} /></Tooltip>
+      render: (text, record) => {
+        // ИСПРАВЛЕНО: Логика определения типа места
+        const isMeeting = record.name?.startsWith('П');
+        
+        return (
+          <Space direction="vertical" size={0}>
+            {/* Вывод типа места вместо "Стандарта" */}
+            <Text style={{ 
+              color: isMeeting ? '#D4AF37' : '#d9d9d9', 
+              fontSize: '12px', 
+              fontWeight: isMeeting ? 'bold' : 'normal',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              {isMeeting ? 'Переговорная' : 'Рабочее место'}
+            </Text>
+            
+            {/* Дополнительное описание (если есть) */}
+            {text && <Text style={{ color: '#595959', fontSize: '11px' }}>{text}</Text>}
+            
+            <Space style={{ fontSize: '16px', marginTop: '4px' }}>
+               {record.equipment?.some(e => e.toLowerCase().includes('монитор')) && <DesktopOutlined style={{ color: '#1677ff' }} />}
+               {record.description?.toLowerCase().includes('окно') && <CloudOutlined style={{ color: '#8c8c8c' }} />}
+               <Tooltip title="Розетки 220V"><InfoCircleOutlined style={{ color: '#52c41a', fontSize: '12px' }} /></Tooltip>
+            </Space>
           </Space>
-        </Space>
-      )
+        );
+      }
     },
     { 
       title: 'Действие', 
@@ -96,12 +114,21 @@ const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId }) => {
 
   return (
     <div className="custom-dark-table">
-      <Table dataSource={data} columns={columns} pagination={{ pageSize: 6 }} rowKey="id" />
+      <Table 
+        dataSource={data} 
+        columns={columns} 
+        pagination={{ pageSize: 6, size: 'small' }} 
+        rowKey="id" 
+      />
       <style jsx="true">{`
         .custom-dark-table .ant-table { background: #141414 !important; color: #fff !important; }
         .custom-dark-table .ant-table-thead > tr > th { background: #1d1d1d !important; color: #8c8c8c !important; border-bottom: 1px solid #333 !important; }
         .custom-dark-table .ant-table-tbody > tr > td { border-bottom: 1px solid #262626 !important; }
         .custom-dark-table .ant-table-tbody > tr:hover > td { background: #1f1f1f !important; }
+        /* Стили для пагинации */
+        .custom-dark-table .ant-pagination-item a { color: #8c8c8c !important; }
+        .custom-dark-table .ant-pagination-item-active { border-color: #fadb14 !important; background: transparent !important; }
+        .custom-dark-table .ant-pagination-item-active a { color: #fadb14 !important; }
       `}</style>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { message, Spin, Typography, Layout } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -18,15 +18,14 @@ const OfficeMapPage = () => {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Состояние фильтров (по умолчанию на завтра, чтобы сразу видеть свободный офис)
   const [filters, setFilters] = useState({ 
     date: dayjs().add(1, 'day').startOf('day'), 
-    timeRange: null 
+    timeRange: null,
+    type: 'all' // Добавляем тип в фильтры для синхронизации
   });
 
-  // 1. Загрузка данных (синхронизировано с Dashboard)
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['dashboardData'], 
+    queryKey: ['mapData'], 
     queryFn: async () => {
       const [ws, active] = await Promise.all([
         workspaceApi.getWorkspaces(),
@@ -38,31 +37,19 @@ const OfficeMapPage = () => {
     staleTime: 0 
   });
 
-  // 2. Улучшенная логика расчета свободных слотов
   const calculateFreeSlots = useCallback((bookings = [], targetDate) => {
-    const MIN_DURATION = 120; // минимальное окно 
+    const MIN_DURATION = 120;
     const now = dayjs();
-    
     let startPos;
-    // Если смотрим слоты на СЕГОДНЯ
+    
     if (targetDate.isSame(now, 'day')) {
       const startOfWorkingDay = targetDate.clone().hour(9).minute(0);
-      
-      // Если сейчас еще нет 9 утра — начинаем с 9:00
-      // Если уже рабочий день — начинаем с "сейчас" + 15 минут запаса
-      if (now.isBefore(startOfWorkingDay)) {
-        startPos = startOfWorkingDay;
-      } else {
-        startPos = now.add(15, 'minute');
-      }
+      startPos = now.isBefore(startOfWorkingDay) ? startOfWorkingDay : now.add(15, 'minute');
     } else {
-      // Для будущих дат всегда начинаем с 9:00
       startPos = targetDate.clone().hour(9).minute(0);
     }
 
     const endDay = targetDate.clone().hour(22).minute(0);
-    
-    // Если текущее время уже после конца рабочего дня
     if (startPos.isAfter(endDay) || startPos.isSame(endDay)) return [];
 
     let freeSlots = [];
@@ -75,41 +62,38 @@ const OfficeMapPage = () => {
     dayBookings.forEach(booking => {
       const bStart = dayjs.utc(booking.start_datetime).local();
       const bEnd = dayjs.utc(booking.end_datetime).local();
-
-      // Если до начала следующей брони есть свободное окно
       if (bStart.isAfter(currentPos) && bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
         freeSlots.push(`${currentPos.format('HH:mm')} - ${bStart.format('HH:mm')}`);
       }
-      
-      // Сдвигаем "курсор" времени на конец брони
-      if (bEnd.isAfter(currentPos)) {
-        currentPos = bEnd;
-      }
+      if (bEnd.isAfter(currentPos)) currentPos = bEnd;
     });
 
-    // Проверяем последнее окно до конца рабочего дня (22:00)
     if (endDay.diff(currentPos, 'minute') >= MIN_DURATION) {
       freeSlots.push(`${currentPos.format('HH:mm')} - ${endDay.format('HH:mm')}`);
     }
-    
     return freeSlots;
   }, []);
 
-  // 3. Обработка данных для карты
   const filteredPlaces = useMemo(() => {
     if (!data?.rawPlaces || !data?.bookings) return [];
-
     const targetDate = filters.date || dayjs().add(1, 'day');
 
-    return data.rawPlaces.map(place => {
+    return data.rawPlaces.filter(place => {
+      // Фильтрация по типу для карты
+      if (filters.type && filters.type !== 'all') {
+        const isMeeting = place.name?.startsWith('П');
+        if (filters.type === 'meeting' && !isMeeting) return false;
+        if (filters.type === 'desk' && isMeeting) return false;
+      }
+      return true;
+    }).map(place => {
       const placeBookings = data.bookings.filter(b => b.workspace_id === place.id);
-      
       let isOccupiedInFilter = false;
+
       if (filters.timeRange) {
         const [start, end] = filters.timeRange;
         const fullStart = targetDate.clone().hour(start.hour()).minute(start.minute());
         const fullEnd = targetDate.clone().hour(end.hour()).minute(end.minute());
-
         isOccupiedInFilter = placeBookings.some(b => {
           const bStart = dayjs.utc(b.start_datetime).local();
           const bEnd = dayjs.utc(b.end_datetime).local();
@@ -130,6 +114,7 @@ const OfficeMapPage = () => {
     mutationFn: workspaceApi.createBooking,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
+      queryClient.invalidateQueries({ queryKey: ['mapData'] });
       message.success('Место успешно забронировано!');
       setIsModalOpen(false);
     },
@@ -138,30 +123,19 @@ const OfficeMapPage = () => {
     }
   });
 
-  if (isLoading || (data && filteredPlaces.length === 0)) {
-    return (
-      <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0a0a0a' }}>
-        <Spin size="large" tip="Загрузка актуальной карты..." />
-      </div>
-    );
-  }
+  if (isLoading) return <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0a0a0a' }}><Spin size="large" /></div>;
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#0a0a0a' }}>
       <Content style={{ padding: '40px' }}>
         <div style={{ marginBottom: '32px', borderLeft: '4px solid #D4AF37', paddingLeft: '20px' }}>
           <h1 style={{ color: '#fff', letterSpacing: '4px', margin: 0, fontSize: '28px' }}>КАРТА ОФИСА</h1>
-          <Typography.Text style={{ color: '#D4AF37', opacity: 0.8 }}>
-            Выберите дату и время. Свободные места отмечены золотым.
-          </Typography.Text>
+          <Typography.Text style={{ color: '#D4AF37', opacity: 0.8 }}>Выберите дату и время.</Typography.Text>
         </div>
 
         <PlacesFilters filters={filters} setFilters={setFilters} />
 
-        <div style={{ 
-          background: '#141414', borderRadius: '16px', padding: '20px', 
-          border: '1px solid #222', height: 'calc(100vh - 300px)', position: 'relative'
-        }}>
+        <div style={{ background: '#141414', borderRadius: '16px', padding: '20px', border: '1px solid #222', height: 'calc(100vh - 300px)', position: 'relative' }}>
           <MapContainer 
             places={filteredPlaces} 
             onSelectPlace={(place) => { setSelectedPlace(place); setIsModalOpen(true); }} 
@@ -174,7 +148,6 @@ const OfficeMapPage = () => {
             open={isModalOpen} 
             place={selectedPlace}
             initialDate={filters.date}
-            // Динамически предлагаем время: если сегодня — то от "сейчас"
             initialTimeRange={
               filters.timeRange 
                 ? filters.timeRange 
@@ -184,6 +157,27 @@ const OfficeMapPage = () => {
             }
             onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
             onConfirm={(vals) => {
+              // 1. Проверка на 2 часа
+              if (vals.end.diff(vals.start, 'minute') < 120) {
+                return message.error('Минимальное время — 2 часа');
+              }
+
+              // 2. ЛОГИКА ЗАПРЕТА: Одно рабочее место в день
+              const isMeetingRoom = selectedPlace?.name?.startsWith('П');
+              if (!isMeetingRoom) {
+                // Проверяем наличие существующих броней рабочего места на выбранную дату
+                const hasExistingDesk = data?.bookings?.some(b => {
+                  const isSameDay = dayjs.utc(b.start_datetime).local().isSame(vals.start, 'day');
+                  const placeDetails = data?.rawPlaces?.find(p => p.id === b.workspace_id);
+                  const isDesk = placeDetails && !placeDetails.name?.startsWith('П');
+                  return isSameDay && isDesk;
+                });
+
+                if (hasExistingDesk) {
+                  return message.error('Вы уже забронировали рабочее место на этот день. Можно забронировать только переговорную.');
+                }
+              }
+
               createMutation.mutate({
                 workspace_id: selectedPlace.id,
                 start_datetime: vals.start.toISOString(),

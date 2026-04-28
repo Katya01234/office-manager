@@ -25,11 +25,12 @@ const Dashboard = () => {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Состояние фильтров
+  // Состояние фильтров (добавили type: 'all')
   const [filters, setFilters] = useState({ 
     onlyFree: false,
     date: dayjs().add(1, 'day').startOf('day'), 
-    timeRange: null 
+    timeRange: null,
+    type: 'all' 
   });
 
   const { data, isLoading, isError } = useQuery({
@@ -84,18 +85,14 @@ const Dashboard = () => {
     }
   });
 
-  // ИСПРАВЛЕННАЯ ЛОГИКА СЛОТОВ (как на карте)
   const calculateFreeSlots = useCallback((bookings = [], targetDate) => {
-    const MIN_DURATION = 120; // Оставляем 2 часа по твоему запросу
+    const MIN_DURATION = 120; 
     const now = dayjs();
     
     let startPos;
     if (targetDate.isSame(now, 'day')) {
       const startOfWorkingDay = targetDate.clone().hour(9).minute(0);
-      // Если сегодня — отсчет от (сейчас + 15 мин), но не раньше 9:00
-      startPos = now.isBefore(startOfWorkingDay) 
-        ? startOfWorkingDay 
-        : now.add(15, 'minute');
+      startPos = now.isBefore(startOfWorkingDay) ? startOfWorkingDay : now.add(15, 'minute');
     } else {
       startPos = targetDate.clone().hour(9).minute(0);
     }
@@ -126,11 +123,20 @@ const Dashboard = () => {
     return freeSlots;
   }, []);
 
+  // ОБНОВЛЕННАЯ ФИЛЬТРАЦИЯ (с учетом типа места)
   const filteredPlaces = useMemo(() => {
     if (!data?.places) return [];
     const targetDate = filters.date || dayjs().add(1, 'day');
     
     return data.places.filter(place => {
+      // 1. Фильтр по типу (desk / meeting)
+      if (filters.type && filters.type !== 'all') {
+        const isMeeting = place.name?.startsWith('П');
+        if (filters.type === 'meeting' && !isMeeting) return false;
+        if (filters.type === 'desk' && isMeeting) return false;
+      }
+
+      // 2. Фильтр "Только свободные сейчас"
       if (filters.onlyFree) {
         const now = dayjs();
         const isOccupiedNow = place.activeBookings.some(b => 
@@ -139,6 +145,7 @@ const Dashboard = () => {
         if (isOccupiedNow) return false;
       }
 
+      // 3. Фильтр по выбранному диапазону времени
       if (filters.timeRange) {
         const [start, end] = filters.timeRange;
         const fullStart = targetDate.clone().hour(start.hour()).minute(start.minute());
@@ -207,7 +214,6 @@ const Dashboard = () => {
             open={isModalOpen} 
             place={selectedPlace}
             initialDate={filters.date}
-            // ИСПРАВЛЕНО: Динамическое время как на карте
             initialTimeRange={
               filters.timeRange 
                 ? filters.timeRange 
@@ -217,9 +223,30 @@ const Dashboard = () => {
             }
             onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
             onConfirm={(vals) => {
+              // 1. Проверка на 2 часа
               if (vals.end.diff(vals.start, 'minute') < 120) {
                 return message.error('Минимальное время — 2 часа');
               }
+
+              // 2. ЗАПРЕТ НА ВТОРОЕ РАБОЧЕЕ МЕСТО
+              const isMeetingRoom = selectedPlace?.name?.startsWith('П');
+              if (!isMeetingRoom) {
+                // Ищем среди активных броней пользователя (в data.userStats.history или активных)
+                // Проверяем только те, что на выбранную дату и не являются переговорками
+                const hasExistingDesk = data.userStats.history.some(b => {
+                  const isSameDay = dayjs.utc(b.start_datetime).local().isSame(vals.start, 'day');
+                  // Находим инфо о месте из этой брони, чтобы проверить его имя
+                  const bookedPlace = data.places.find(p => p.id === b.workspace_id);
+                  const isDesk = bookedPlace && !bookedPlace.name?.startsWith('П');
+                  
+                  return isSameDay && isDesk;
+                });
+
+                if (hasExistingDesk) {
+                  return message.error('Вы уже забронировали рабочее место на этот день. Можно забронировать только переговорную.');
+                }
+              }
+
               createMutation.mutate({
                 workspace_id: selectedPlace.id,
                 start_datetime: vals.start.toISOString(),
