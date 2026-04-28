@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Row, Col, message, Spin, Layout } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -25,6 +25,7 @@ const Dashboard = () => {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // Состояние фильтров
   const [filters, setFilters] = useState({ 
     onlyFree: false,
     date: dayjs().add(1, 'day').startOf('day'), 
@@ -79,18 +80,31 @@ const Dashboard = () => {
       setIsModalOpen(false);
     },
     onError: (err) => {
-      // Выводим конкретную ошибку из сваггера, если она есть
       message.error(err.response?.status === 409 ? 'Это время уже занято' : 'Ошибка бронирования');
     }
   });
 
+  // ИСПРАВЛЕННАЯ ЛОГИКА СЛОТОВ (как на карте)
   const calculateFreeSlots = useCallback((bookings = [], targetDate) => {
-    const MIN_DURATION = 120;
-    const startDay = targetDate.clone().hour(9).minute(0).second(0);
-    const endDay = targetDate.clone().hour(22).minute(0).second(0);
+    const MIN_DURATION = 120; // Оставляем 2 часа по твоему запросу
+    const now = dayjs();
     
+    let startPos;
+    if (targetDate.isSame(now, 'day')) {
+      const startOfWorkingDay = targetDate.clone().hour(9).minute(0);
+      // Если сегодня — отсчет от (сейчас + 15 мин), но не раньше 9:00
+      startPos = now.isBefore(startOfWorkingDay) 
+        ? startOfWorkingDay 
+        : now.add(15, 'minute');
+    } else {
+      startPos = targetDate.clone().hour(9).minute(0);
+    }
+
+    const endDay = targetDate.clone().hour(22).minute(0);
+    if (startPos.isAfter(endDay) || startPos.isSame(endDay)) return [];
+
     let freeSlots = [];
-    let currentPos = startDay;
+    let currentPos = startPos;
 
     const dayBookings = bookings
       .filter(b => dayjs.utc(b.start_datetime).local().isSame(targetDate, 'day'))
@@ -98,10 +112,11 @@ const Dashboard = () => {
 
     dayBookings.forEach(booking => {
       const bStart = dayjs.utc(booking.start_datetime).local();
-      if (bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
+      const bEnd = dayjs.utc(booking.end_datetime).local();
+
+      if (bStart.isAfter(currentPos) && bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
         freeSlots.push(`${currentPos.format('HH:mm')} - ${bStart.format('HH:mm')}`);
       }
-      const bEnd = dayjs.utc(booking.end_datetime).local();
       if (bEnd.isAfter(currentPos)) currentPos = bEnd;
     });
 
@@ -116,7 +131,6 @@ const Dashboard = () => {
     const targetDate = filters.date || dayjs().add(1, 'day');
     
     return data.places.filter(place => {
-      // Проверка "Свободно сейчас"
       if (filters.onlyFree) {
         const now = dayjs();
         const isOccupiedNow = place.activeBookings.some(b => 
@@ -125,7 +139,6 @@ const Dashboard = () => {
         if (isOccupiedNow) return false;
       }
 
-      // Проверка пересечения с выбранным фильтром времени
       if (filters.timeRange) {
         const [start, end] = filters.timeRange;
         const fullStart = targetDate.clone().hour(start.hour()).minute(start.minute());
@@ -145,8 +158,8 @@ const Dashboard = () => {
     }));
   }, [data?.places, filters, calculateFreeSlots]);
 
-  if (isLoading) return <div style={{ textAlign: 'center', padding: '100px' }}><Spin size="large" /></div>;
-  if (isError) return <div style={{ color: '#fff', textAlign: 'center' }}>Ошибка загрузки данных</div>;
+  if (isLoading) return <div style={{ textAlign: 'center', padding: '100px', background: '#000', minHeight: '100vh' }}><Spin size="large" /></div>;
+  if (isError) return <div style={{ color: '#fff', textAlign: 'center', padding: '100px' }}>Ошибка загрузки данных</div>;
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#000' }}>
@@ -189,24 +202,32 @@ const Dashboard = () => {
           </Col>
         </Row>
 
-        <BookingModal 
-          open={isModalOpen} 
-          place={selectedPlace}
-          initialDate={filters.date}
-          initialTimeRange={filters.timeRange}
-          onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
-          onConfirm={(vals) => {
-            if (vals.end.diff(vals.start, 'minute') < 120) {
-              return message.error('Минимальное время — 2 часа');
+        {selectedPlace && (
+          <BookingModal 
+            open={isModalOpen} 
+            place={selectedPlace}
+            initialDate={filters.date}
+            // ИСПРАВЛЕНО: Динамическое время как на карте
+            initialTimeRange={
+              filters.timeRange 
+                ? filters.timeRange 
+                : (filters.date.isSame(dayjs(), 'day') 
+                    ? [dayjs().add(20, 'minute'), dayjs().add(140, 'minute')] 
+                    : [dayjs().hour(9).minute(0), dayjs().hour(11).minute(0)])
             }
-            // ИСПРАВЛЕНО: Приведение к ISO UTC для Swagger
-            createMutation.mutate({
-              workspace_id: selectedPlace.id,
-              start_datetime: vals.start.toISOString(),
-              end_datetime: vals.end.toISOString()
-            });
-          }}
-        />
+            onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
+            onConfirm={(vals) => {
+              if (vals.end.diff(vals.start, 'minute') < 120) {
+                return message.error('Минимальное время — 2 часа');
+              }
+              createMutation.mutate({
+                workspace_id: selectedPlace.id,
+                start_datetime: vals.start.toISOString(),
+                end_datetime: vals.end.toISOString()
+              });
+            }}
+          />
+        )}
       </Content>
     </Layout>
   );

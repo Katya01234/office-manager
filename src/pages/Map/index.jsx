@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { message, Spin, Typography, Layout } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -18,13 +18,13 @@ const OfficeMapPage = () => {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Состояние фильтров
+  // Состояние фильтров (по умолчанию на завтра, чтобы сразу видеть свободный офис)
   const [filters, setFilters] = useState({ 
     date: dayjs().add(1, 'day').startOf('day'), 
     timeRange: null 
   });
 
-  // 1. Синхронизируем ключ с Дашбордом и добавляем настройки обновления
+  // 1. Загрузка данных (синхронизировано с Dashboard)
   const { data, isLoading, isError } = useQuery({
     queryKey: ['dashboardData'], 
     queryFn: async () => {
@@ -32,24 +32,41 @@ const OfficeMapPage = () => {
         workspaceApi.getWorkspaces(),
         workspaceApi.getBookings()
       ]);
-      return {
-        rawPlaces: ws,
-        bookings: active
-      };
+      return { rawPlaces: ws, bookings: active };
     },
-    // Гарантируем свежесть данных при заходе на карту
     refetchOnMount: true,
     staleTime: 0 
   });
 
-  // Логика расчета свободных слотов
+  // 2. Улучшенная логика расчета свободных слотов
   const calculateFreeSlots = useCallback((bookings = [], targetDate) => {
-    const MIN_DURATION = 120;
-    const startDay = targetDate.clone().hour(9).minute(0).second(0);
-    const endDay = targetDate.clone().hour(22).minute(0).second(0);
+    const MIN_DURATION = 120; // минимальное окно 
+    const now = dayjs();
     
+    let startPos;
+    // Если смотрим слоты на СЕГОДНЯ
+    if (targetDate.isSame(now, 'day')) {
+      const startOfWorkingDay = targetDate.clone().hour(9).minute(0);
+      
+      // Если сейчас еще нет 9 утра — начинаем с 9:00
+      // Если уже рабочий день — начинаем с "сейчас" + 15 минут запаса
+      if (now.isBefore(startOfWorkingDay)) {
+        startPos = startOfWorkingDay;
+      } else {
+        startPos = now.add(15, 'minute');
+      }
+    } else {
+      // Для будущих дат всегда начинаем с 9:00
+      startPos = targetDate.clone().hour(9).minute(0);
+    }
+
+    const endDay = targetDate.clone().hour(22).minute(0);
+    
+    // Если текущее время уже после конца рабочего дня
+    if (startPos.isAfter(endDay) || startPos.isSame(endDay)) return [];
+
     let freeSlots = [];
-    let currentPos = startDay;
+    let currentPos = startPos;
 
     const dayBookings = bookings
       .filter(b => dayjs.utc(b.start_datetime).local().isSame(targetDate, 'day'))
@@ -57,22 +74,29 @@ const OfficeMapPage = () => {
 
     dayBookings.forEach(booking => {
       const bStart = dayjs.utc(booking.start_datetime).local();
-      if (bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
+      const bEnd = dayjs.utc(booking.end_datetime).local();
+
+      // Если до начала следующей брони есть свободное окно
+      if (bStart.isAfter(currentPos) && bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
         freeSlots.push(`${currentPos.format('HH:mm')} - ${bStart.format('HH:mm')}`);
       }
-      const bEnd = dayjs.utc(booking.end_datetime).local();
-      if (bEnd.isAfter(currentPos)) currentPos = bEnd;
+      
+      // Сдвигаем "курсор" времени на конец брони
+      if (bEnd.isAfter(currentPos)) {
+        currentPos = bEnd;
+      }
     });
 
+    // Проверяем последнее окно до конца рабочего дня (22:00)
     if (endDay.diff(currentPos, 'minute') >= MIN_DURATION) {
       freeSlots.push(`${currentPos.format('HH:mm')} - ${endDay.format('HH:mm')}`);
     }
+    
     return freeSlots;
   }, []);
 
-  // 2. Формируем список мест с защитой от undefined
+  // 3. Обработка данных для карты
   const filteredPlaces = useMemo(() => {
-    // КРИТИЧНО: Проверяем наличие и мест, и бронирований одновременно
     if (!data?.rawPlaces || !data?.bookings) return [];
 
     const targetDate = filters.date || dayjs().add(1, 'day');
@@ -105,7 +129,6 @@ const OfficeMapPage = () => {
   const createMutation = useMutation({
     mutationFn: workspaceApi.createBooking,
     onSuccess: () => {
-      // Инвалидируем общий ключ, чтобы и карта, и дашборд обновились
       queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
       message.success('Место успешно забронировано!');
       setIsModalOpen(false);
@@ -115,17 +138,12 @@ const OfficeMapPage = () => {
     }
   });
 
-  // Если идет первичная загрузка или данные еще не "смержились", показываем спиннер
   if (isLoading || (data && filteredPlaces.length === 0)) {
     return (
       <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0a0a0a' }}>
-        <Spin size="large" tip="Загрузка карты офиса..." />
+        <Spin size="large" tip="Загрузка актуальной карты..." />
       </div>
     );
-  }
-
-  if (isError) {
-    return <div style={{ color: 'white', textAlign: 'center', marginTop: '50px' }}>Ошибка загрузки данных. Попробуйте обновить страницу.</div>;
   }
 
   return (
@@ -134,7 +152,7 @@ const OfficeMapPage = () => {
         <div style={{ marginBottom: '32px', borderLeft: '4px solid #D4AF37', paddingLeft: '20px' }}>
           <h1 style={{ color: '#fff', letterSpacing: '4px', margin: 0, fontSize: '28px' }}>КАРТА ОФИСА</h1>
           <Typography.Text style={{ color: '#D4AF37', opacity: 0.8 }}>
-            Выберите дату и время, чтобы увидеть доступные места
+            Выберите дату и время. Свободные места отмечены золотым.
           </Typography.Text>
         </div>
 
@@ -156,7 +174,14 @@ const OfficeMapPage = () => {
             open={isModalOpen} 
             place={selectedPlace}
             initialDate={filters.date}
-            initialTimeRange={filters.timeRange}
+            // Динамически предлагаем время: если сегодня — то от "сейчас"
+            initialTimeRange={
+              filters.timeRange 
+                ? filters.timeRange 
+                : (filters.date.isSame(dayjs(), 'day') 
+                    ? [dayjs().add(20, 'minute'), dayjs().add(140, 'minute')] 
+                    : [dayjs().hour(9).minute(0), dayjs().hour(11).minute(0)])
+            }
             onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
             onConfirm={(vals) => {
               createMutation.mutate({
