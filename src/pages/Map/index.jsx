@@ -7,7 +7,7 @@ import utc from 'dayjs/plugin/utc';
 import { workspaceApi } from '../../api/api';
 import MapContainer from './Components/MapContainer';
 import BookingModal from '../Dashboard/components/BookingModal';
-import PlacesFilters from '../Dashboard/components/PlacesFilters'; // Импортируем готовые фильтры
+import PlacesFilters from '../Dashboard/components/PlacesFilters';
 
 dayjs.extend(isBetween);
 dayjs.extend(utc);
@@ -18,14 +18,15 @@ const OfficeMapPage = () => {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Состояние фильтров (такое же, как в Dashboard)
+  // Состояние фильтров
   const [filters, setFilters] = useState({ 
     date: dayjs().add(1, 'day').startOf('day'), 
     timeRange: null 
   });
 
+  // 1. Синхронизируем ключ с Дашбордом и добавляем настройки обновления
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['dashboardData'], // Отдельный ключ для карты
+    queryKey: ['dashboardData'], 
     queryFn: async () => {
       const [ws, active] = await Promise.all([
         workspaceApi.getWorkspaces(),
@@ -35,10 +36,13 @@ const OfficeMapPage = () => {
         rawPlaces: ws,
         bookings: active
       };
-    }
+    },
+    // Гарантируем свежесть данных при заходе на карту
+    refetchOnMount: true,
+    staleTime: 0 
   });
 
-  // Логика расчета свободных слотов (вынесена из Dashboard)
+  // Логика расчета свободных слотов
   const calculateFreeSlots = useCallback((bookings = [], targetDate) => {
     const MIN_DURATION = 120;
     const startDay = targetDate.clone().hour(9).minute(0).second(0);
@@ -66,15 +70,16 @@ const OfficeMapPage = () => {
     return freeSlots;
   }, []);
 
-  // Формируем список мест с учетом фильтров и слотов
+  // 2. Формируем список мест с защитой от undefined
   const filteredPlaces = useMemo(() => {
-    if (!data?.rawPlaces) return [];
+    // КРИТИЧНО: Проверяем наличие и мест, и бронирований одновременно
+    if (!data?.rawPlaces || !data?.bookings) return [];
+
     const targetDate = filters.date || dayjs().add(1, 'day');
 
     return data.rawPlaces.map(place => {
       const placeBookings = data.bookings.filter(b => b.workspace_id === place.id);
       
-      // Проверка занятости на выбранный интервал времени
       let isOccupiedInFilter = false;
       if (filters.timeRange) {
         const [start, end] = filters.timeRange;
@@ -100,6 +105,7 @@ const OfficeMapPage = () => {
   const createMutation = useMutation({
     mutationFn: workspaceApi.createBooking,
     onSuccess: () => {
+      // Инвалидируем общий ключ, чтобы и карта, и дашборд обновились
       queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
       message.success('Место успешно забронировано!');
       setIsModalOpen(false);
@@ -109,7 +115,18 @@ const OfficeMapPage = () => {
     }
   });
 
-  if (isLoading) return <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#000' }}><Spin size="large" /></div>;
+  // Если идет первичная загрузка или данные еще не "смержились", показываем спиннер
+  if (isLoading || (data && filteredPlaces.length === 0)) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0a0a0a' }}>
+        <Spin size="large" tip="Загрузка карты офиса..." />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return <div style={{ color: 'white', textAlign: 'center', marginTop: '50px' }}>Ошибка загрузки данных. Попробуйте обновить страницу.</div>;
+  }
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#0a0a0a' }}>
@@ -117,11 +134,10 @@ const OfficeMapPage = () => {
         <div style={{ marginBottom: '32px', borderLeft: '4px solid #D4AF37', paddingLeft: '20px' }}>
           <h1 style={{ color: '#fff', letterSpacing: '4px', margin: 0, fontSize: '28px' }}>КАРТА ОФИСА</h1>
           <Typography.Text style={{ color: '#D4AF37', opacity: 0.8 }}>
-            Выберите дату ивремя, чтобы увидеть доступные места
+            Выберите дату и время, чтобы увидеть доступные места
           </Typography.Text>
         </div>
 
-        {/* Секция фильтров */}
         <PlacesFilters filters={filters} setFilters={setFilters} />
 
         <div style={{ 
@@ -131,24 +147,26 @@ const OfficeMapPage = () => {
           <MapContainer 
             places={filteredPlaces} 
             onSelectPlace={(place) => { setSelectedPlace(place); setIsModalOpen(true); }} 
-            selectedDate={filters.date} // Передаем дату для корректного отображения в Modal
+            selectedDate={filters.date}
           />
         </div>
 
-        <BookingModal 
-          open={isModalOpen} 
-          place={selectedPlace}
-          initialDate={filters.date}
-          initialTimeRange={filters.timeRange}
-          onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
-          onConfirm={(vals) => {
-            createMutation.mutate({
-              workspace_id: selectedPlace.id,
-              start_datetime: vals.start.toISOString(),
-              end_datetime: vals.end.toISOString()
-            });
-          }}
-        />
+        {selectedPlace && (
+          <BookingModal 
+            open={isModalOpen} 
+            place={selectedPlace}
+            initialDate={filters.date}
+            initialTimeRange={filters.timeRange}
+            onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
+            onConfirm={(vals) => {
+              createMutation.mutate({
+                workspace_id: selectedPlace.id,
+                start_datetime: vals.start.toISOString(),
+                end_datetime: vals.end.toISOString()
+              });
+            }}
+          />
+        )}
       </Content>
     </Layout>
   );
