@@ -28,12 +28,13 @@ const Dashboard = () => {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['dashboardData'],
     queryFn: async () => {
-      const [ws, active, fav, hist, main] = await Promise.all([
+      const [ws, active, fav, hist, main, vkStatus] = await Promise.all([
         workspaceApi.getWorkspaces(),
         workspaceApi.getBookings(),
         workspaceApi.getFavorite(),
         workspaceApi.getBookingHistory(),
-        workspaceApi.getMainWorkspace()
+        workspaceApi.getMainWorkspace(),
+        workspaceApi.getVkStatus()
       ]);
 
       const combinedHistory = [...(active || []), ...(hist || [])];
@@ -43,7 +44,7 @@ const Dashboard = () => {
           history: Array.from(new Map(combinedHistory.map(item => [item.id, item])).values()),
           favoritePlace: fav,
           mainPlace: main,
-          isVkConnected: !!localStorage.getItem('vk_connected')
+          vkStatus: vkStatus
         }
       };
     }
@@ -129,6 +130,7 @@ const Dashboard = () => {
           <BookingModal 
             open={isModalOpen} 
             place={selectedPlace}
+            vkStatus={data.userStats.vkStatus}
             initialDate={filters.date}
             onCancel={() => setIsModalOpen(false)}
             onConfirm={(vals) => {

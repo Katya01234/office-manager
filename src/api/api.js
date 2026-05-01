@@ -69,6 +69,15 @@ export const workspaceApi = {
     getMe: async () => {
     const response = await api.get('/me');
     return response.data;
+  },
+
+  getVkStatus: async () => {
+    try {
+      const response = await api.get('/me/vk/status');
+      return response.data;
+    } catch (e) {
+      return { is_linked: false, message_allowed: false };
+    }
   }
 
 };

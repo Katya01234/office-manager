@@ -28,11 +28,12 @@ const OfficeMapPage = () => {
     queryKey: ['mapData', filters.date.format('YYYY-MM-DD')], 
     queryFn: async () => {
       // Используем ту же логику запросов, что и в Dashboard
-      const [ws, active, fav, main] = await Promise.all([
+      const [ws, active, fav, main, vkStatus] = await Promise.all([
         workspaceApi.getWorkspaces(),
         workspaceApi.getBookings(),
         workspaceApi.getFavorite(),    
-        workspaceApi.getMainWorkspace() 
+        workspaceApi.getMainWorkspace(),
+        workspaceApi.getVkStatus()
       ]);
       
       return { 
@@ -40,7 +41,8 @@ const OfficeMapPage = () => {
         bookings: active, 
         userStats: {
           favoritePlace: fav,
-          mainPlace: main
+          mainPlace: main,
+          vkStatus: vkStatus
         } 
       };
     },
@@ -162,6 +164,7 @@ const OfficeMapPage = () => {
           <BookingModal 
             open={isModalOpen} 
             place={selectedPlace}
+            vkStatus={data?.userStats?.vkStatus}
             initialDate={filters.date}
             initialTimeRange={
               filters.timeRange 
