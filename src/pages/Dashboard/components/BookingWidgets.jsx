@@ -21,18 +21,23 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
   const [now, setNow] = useState(dayjs());
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(dayjs()), 30000);
+    const timer = setInterval(() => {
+        // Обновляем стейт только если изменилась минута, чтобы не спамить рендерами
+        const newNow = dayjs();
+        if (newNow.minute() !== now.minute()) setNow(newNow);
+    }, 10000);
     return () => clearInterval(timer);
-  }, []);
+  }, [now]);
 
   const targetDate = filters?.date || dayjs().add(1, 'day');
   
   const { currentActive, nextBooking } = useMemo(() => {
     const history = userStats?.history || [];
-    // ИСПРАВЛЕНО: Парсим как UTC и сравниваем с локальным now
+    
     const active = history.find(b => 
       now.isBetween(dayjs.utc(b.start_datetime).local(), dayjs.utc(b.end_datetime).local())
     );
+
     const future = history
       .filter(b => dayjs.utc(b.start_datetime).local().isAfter(now))
       .sort((a, b) => dayjs.utc(a.start_datetime).valueOf() - dayjs.utc(b.start_datetime).valueOf())[0];
@@ -43,33 +48,45 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
   const displayBooking = currentActive || nextBooking;
   const isActiveNow = !!currentActive;
 
-  const favoriteFullData = places?.find(p => p.id === userStats?.favoritePlace?.id);
+  const favoriteFullData = useMemo(() => 
+    places?.find(p => p.id === userStats?.favoritePlace?.id),
+    [places, userStats?.favoritePlace?.id]
+  );
 
   const favoriteSlots = useMemo(() => {
     if (!favoriteFullData) return [];
     const MIN_DURATION = 120;
+    
     const startDay = targetDate.clone().hour(9).minute(0).second(0);
     const endDay = targetDate.clone().hour(22).minute(0).second(0);
     
+    let currentPos = targetDate.isSame(dayjs(), 'day') 
+      ? dayjs().add(15, 'minute') 
+      : startDay;
+
     const dayBookings = (favoriteFullData.activeBookings || [])
-      .filter(b => dayjs.utc(b.start_datetime).local().isSame(targetDate, 'day'))
-      .sort((a, b) => dayjs.utc(a.start_datetime).diff(dayjs.utc(b.start_datetime)));
+      .map(b => ({
+        start: dayjs.utc(b.start_datetime).local(),
+        end: dayjs.utc(b.end_datetime).local()
+      }))
+      .filter(b => b.start.isSame(targetDate, 'day'))
+      .sort((a, b) => a.start.diff(b.start));
 
     let freeSlots = [];
-    let currentPos = startDay;
 
     dayBookings.forEach(booking => {
-      const bStart = dayjs.utc(booking.start_datetime).local();
-      const bEnd = dayjs.utc(booking.end_datetime).local();
-      if (bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
-        freeSlots.push(`${currentPos.format('HH:mm')} - ${bStart.format('HH:mm')}`);
+      if (booking.start.diff(currentPos, 'minute') >= MIN_DURATION) {
+        freeSlots.push(`${currentPos.format('HH:mm')} - ${booking.start.format('HH:mm')}`);
       }
-      if (bEnd.isAfter(currentPos)) { currentPos = bEnd; }
+      if (booking.end.isAfter(currentPos)) {
+        currentPos = booking.end;
+      }
     });
 
     if (endDay.diff(currentPos, 'minute') >= MIN_DURATION) {
       freeSlots.push(`${currentPos.format('HH:mm')} - ${endDay.format('HH:mm')}`);
     }
+    
     return freeSlots;
   }, [favoriteFullData, targetDate]);
 
@@ -133,14 +150,10 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
                 {userStats?.favoritePlace?.name || 'Не выбрано'}
               </Title>
               
-              {favoriteFullData && isFavoriteFree ? (
+              {favoriteFullData && isFavoriteFree && (
                 <Button size="small" type="primary" ghost style={{ marginTop: 8, borderColor: '#fadb14', color: '#fadb14' }}>
                   Забронировать на {targetDate.format('DD.MM')}
                 </Button>
-              ) : favoriteFullData && (
-                <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginTop: 8 }}>
-                  Нет окон более 2-х часов
-                </Text>
               )}
             </Space>
           </Card>
@@ -172,7 +185,6 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
                       {displayBooking.workspace_name || `Место #${displayBooking.workspace_id}`}
                     </Title>
                     <Text style={{ color: isActiveNow ? '#000' : '#8c8c8c', fontSize: '13px' }}>
-                      {/* ИСПРАВЛЕНО: Корректный вывод даты и времени из UTC */}
                       {!dayjs.utc(displayBooking.start_datetime).local().isSame(dayjs(), 'day') && 
                         dayjs.utc(displayBooking.start_datetime).local().format('DD.MM ')}
                       {dayjs.utc(displayBooking.start_datetime).local().format('HH:mm')} — {dayjs.utc(displayBooking.end_datetime).local().format('HH:mm')}
@@ -181,7 +193,11 @@ const BookingWidgets = ({ userStats, places, filters, onSelectPlace, onCancelBoo
                   
                   <Button 
                     danger icon={<DeleteOutlined />} size="middle" 
-                    onClick={(e) => { e.stopPropagation(); onCancelBooking(displayBooking.id); }} 
+                    onClick={(e) => { 
+                        // ОСТАНАВЛИВАЕМ ВСПЛЫТИЕ, чтобы не сработал onClick карточки
+                        e.stopPropagation(); 
+                        onCancelBooking(displayBooking.id); 
+                    }} 
                     style={{ 
                       background: isActiveNow ? '#000' : 'rgba(255, 77, 79, 0.1)', 
                       color: isActiveNow ? '#fff' : '#ff4d4f', border: 'none', fontWeight: 'bold'

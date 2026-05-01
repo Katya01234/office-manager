@@ -78,6 +78,17 @@ export const workspaceApi = {
     } catch (e) {
       return { is_linked: false, message_allowed: false };
     }
-  }
+  },
+
+checkAvailability: async (id, start, end) => {
+    // Используем 'api' вместо 'axios', чтобы подтянулись базовый URL и интерцепторы
+    const response = await api.get(`/workspaces/${id}/availability`, {
+        params: {
+            start_datetime: start,
+            end_datetime: end
+        }
+    });
+    return response.data; // { available: boolean, ... }
+}
 
 };

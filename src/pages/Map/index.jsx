@@ -3,7 +3,7 @@ import { message, Spin, Typography, Layout } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
-import utc from 'dayjs/plugin/utc';
+import utc from 'dayjs/plugin/utc'; // Добавлено для синхронизации с Dashboard
 import { workspaceApi } from '../../api/api'; 
 import MapContainer from './Components/MapContainer';
 import BookingModal from '../Dashboard/components/BookingModal';
@@ -27,7 +27,6 @@ const OfficeMapPage = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['mapData', filters.date.format('YYYY-MM-DD')], 
     queryFn: async () => {
-      // Используем ту же логику запросов, что и в Dashboard
       const [ws, active, fav, main, vkStatus] = await Promise.all([
         workspaceApi.getWorkspaces(),
         workspaceApi.getBookings(),
@@ -37,8 +36,8 @@ const OfficeMapPage = () => {
       ]);
       
       return { 
-        rawPlaces: ws, 
-        bookings: active, 
+        rawPlaces: ws || [], 
+        bookings: active || [], 
         userStats: {
           favoritePlace: fav,
           mainPlace: main,
@@ -55,30 +54,33 @@ const OfficeMapPage = () => {
     const now = dayjs();
     let startPos;
     
+    // Исправленная логика начальной точки отсчета
     if (targetDate.isSame(now, 'day')) {
-      const startOfWorkingDay = targetDate.clone().hour(9).minute(0);
+      const startOfWorkingDay = targetDate.clone().hour(9).minute(0).second(0);
       startPos = now.isBefore(startOfWorkingDay) ? startOfWorkingDay : now.add(15, 'minute');
     } else {
-      startPos = targetDate.clone().hour(9).minute(0);
+      startPos = targetDate.clone().hour(9).minute(0).second(0);
     }
 
-    const endDay = targetDate.clone().hour(22).minute(0);
+    const endDay = targetDate.clone().hour(22).minute(0).second(0);
     if (startPos.isAfter(endDay) || startPos.isSame(endDay)) return [];
 
     let freeSlots = [];
     let currentPos = startPos;
 
     const dayBookings = bookings
-      .filter(b => dayjs.utc(b.start_datetime).local().isSame(targetDate, 'day'))
-      .sort((a, b) => dayjs.utc(a.start_datetime).diff(dayjs.utc(b.start_datetime)));
+      .map(b => ({
+        start: dayjs.utc(b.start_datetime).local(),
+        end: dayjs.utc(b.end_datetime).local()
+      }))
+      .filter(b => b.start.isSame(targetDate, 'day'))
+      .sort((a, b) => a.start.diff(b.start));
 
-    dayBookings.forEach(booking => {
-      const bStart = dayjs.utc(booking.start_datetime).local();
-      const bEnd = dayjs.utc(booking.end_datetime).local();
-      if (bStart.isAfter(currentPos) && bStart.diff(currentPos, 'minute') >= MIN_DURATION) {
-        freeSlots.push(`${currentPos.format('HH:mm')} - ${bStart.format('HH:mm')}`);
+    dayBookings.forEach(b => {
+      if (b.start.isAfter(currentPos) && b.start.diff(currentPos, 'minute') >= MIN_DURATION) {
+        freeSlots.push(`${currentPos.format('HH:mm')} - ${b.start.format('HH:mm')}`);
       }
-      if (bEnd.isAfter(currentPos)) currentPos = bEnd;
+      if (b.end.isAfter(currentPos)) currentPos = b.end;
     });
 
     if (endDay.diff(currentPos, 'minute') >= MIN_DURATION) {
@@ -88,7 +90,7 @@ const OfficeMapPage = () => {
   }, []);
 
   const filteredPlaces = useMemo(() => {
-    if (!data?.rawPlaces || !data?.bookings) return [];
+    if (!data?.rawPlaces) return [];
     const targetDate = filters.date || dayjs().add(1, 'day');
 
     return data.rawPlaces.filter(place => {
@@ -104,8 +106,9 @@ const OfficeMapPage = () => {
 
       if (filters.timeRange) {
         const [start, end] = filters.timeRange;
-        const fullStart = targetDate.clone().hour(start.hour()).minute(start.minute());
-        const fullEnd = targetDate.clone().hour(end.hour()).minute(end.minute());
+        const fullStart = targetDate.clone().hour(start.hour()).minute(start.minute()).second(0);
+        const fullEnd = targetDate.clone().hour(end.hour()).minute(end.minute()).second(0);
+        
         isOccupiedInFilter = placeBookings.some(b => {
           const bStart = dayjs.utc(b.start_datetime).local();
           const bEnd = dayjs.utc(b.end_datetime).local();
@@ -146,7 +149,7 @@ const OfficeMapPage = () => {
       <Content style={{ padding: '40px' }}>
         <div style={{ marginBottom: '32px', borderLeft: '4px solid #D4AF37', paddingLeft: '20px' }}>
           <h1 style={{ color: '#fff', letterSpacing: '4px', margin: 0, fontSize: '28px' }}>КАРТА ОФИСА</h1>
-          <Typography.Text style={{ color: '#D4AF37', opacity: 0.8 }}>Выберите дату и время.</Typography.Text>
+          <Typography.Text style={{ color: '#D4AF37', opacity: 0.8 }}>Выберите дату и время для бронирования карте.</Typography.Text>
         </div>
 
         <PlacesFilters filters={filters} setFilters={setFilters} />
@@ -175,14 +178,17 @@ const OfficeMapPage = () => {
             }
             onCancel={() => { setIsModalOpen(false); setSelectedPlace(null); }}
             onConfirm={(vals) => {
+              // Валидация
               if (vals.end.diff(vals.start, 'minute') < 120) {
                 return message.error('Минимальное время — 2 часа');
               }
 
+              // Проверка на существующее бронирование стола (не переговорки)
               const isMeetingRoom = selectedPlace?.name?.startsWith('П');
               if (!isMeetingRoom) {
                 const hasExistingDesk = data?.bookings?.some(b => {
-                  const isSameDay = dayjs.utc(b.start_datetime).local().isSame(vals.start, 'day');
+                  const bStart = dayjs.utc(b.start_datetime).local();
+                  const isSameDay = bStart.isSame(vals.start, 'day');
                   const placeDetails = data?.rawPlaces?.find(p => p.id === b.workspace_id);
                   const isDesk = placeDetails && !placeDetails.name?.startsWith('П');
                   return isSameDay && isDesk;
@@ -193,10 +199,11 @@ const OfficeMapPage = () => {
                 }
               }
 
+              // ИСПОЛЬЗУЕМ UTC ПРИ ОТПРАВКЕ
               createMutation.mutate({
                 workspace_id: selectedPlace.id,
-                start_datetime: vals.start.toISOString(),
-                end_datetime: vals.end.toISOString()
+                start_datetime: vals.start.utc().format(),
+                end_datetime: vals.end.utc().format()
               });
             }}
           />
