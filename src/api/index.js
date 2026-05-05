@@ -23,7 +23,13 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Проверяем 401 и что это не запрос к самому /auth/refresh (чтобы избежать цикла)
+    // 1. ПРОВЕРКА: Если ошибка 401 случилась на странице логина, 
+    // просто пробрасываем ошибку дальше в компонент Login.jsx
+    if (originalRequest.url.includes('/auth/sign-in')) {
+      return Promise.reject(error);
+    }
+
+    // Проверяем 401 и что это не запрос к самому /auth/refresh
     if (
       error.response?.status === 401 && 
       !originalRequest._retry && 
@@ -37,8 +43,6 @@ api.interceptors.response.use(
 
         const cleanRefreshToken = String(refreshToken).replace(/['"]+/g, '');
 
-        // Используем чистый axios, а не наш экземпляр api, 
-        // чтобы не зациклить интерцепторы в случае ошибки рефреша
         const res = await axios.post(`${API_URL}/auth/refresh`, {
           refresh_token: cleanRefreshToken
         });
@@ -49,25 +53,23 @@ api.interceptors.response.use(
             ? String(res.data.refresh_token).replace(/['"]+/g, '') 
             : null;
 
-          // Сохраняем новые данные
           localStorage.setItem('access_token', newAccessToken);
           if (newRefreshToken) {
             localStorage.setItem('refresh_token', newRefreshToken);
           }
 
-          // Обновляем заголовок именно в текущем (упавшем) запросе
           originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
-          
-          // Повторяем запрос с обновленным конфигом
           return api(originalRequest);
         }
       } catch (refreshError) {
-        // Если рефреш протух — полная очистка и редирект
+        // Если мы здесь, значит сессия реально протухла
         console.error("Refresh session expired:", refreshError);
         localStorage.clear();
         
-        // Используем replace, чтобы нельзя было нажать "назад" в заблокированную сессию
-        window.location.replace('/login');
+        // Редирект только если мы не на странице логина
+        if (!window.location.pathname.includes('/login')) {
+           window.location.replace('/login');
+        }
         return Promise.reject(refreshError);
       }
     }

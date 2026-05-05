@@ -147,3 +147,12 @@ svg {
   from { opacity: 0; filter: blur(10px); }
   to { opacity: 1; filter: blur(0); }
 }
+
+/* Убираем синий фон при автозаполнении */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff !important; /* Цвет текста */
+  -webkit-box-shadow: 0 0 0px 1000px #000 inset !important; /* Цвет фона (черный как в дизайне) */
+  transition: background-color 5000s ease-in-out 0s;
+}
