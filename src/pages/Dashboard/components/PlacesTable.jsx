@@ -1,12 +1,58 @@
 import React from 'react';
-import { Table, Tag, Button, Space, Typography, Tooltip } from 'antd';
+import { Table, Tag, Button, Space, Typography, Tooltip, Spin } from 'antd';
 import { 
   HeartFilled, HeartOutlined, LockOutlined, 
   DesktopOutlined, CloudOutlined, ClockCircleOutlined,
   InfoCircleOutlined, PushpinFilled
 } from '@ant-design/icons';
+import { useQuery } from '@tanstack/react-query';
+import { workspaceApi } from '../../../api/api';
 
 const { Text } = Typography;
+
+// Микро-компонент для ленивой загрузки реальных данных об оснащении
+const EquipmentTooltip = ({ workspaceId }) => {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['workspaceDetails', workspaceId],
+    queryFn: () => workspaceApi.getWorkspaceDetails(workspaceId),
+    enabled: false, // Не грузим сразу, чтобы не спамить запросами
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const content = isLoading ? (
+    <Spin size="small" />
+  ) : (
+    <div style={{ maxWidth: '200px' }}>
+      {data?.location && (
+        <div style={{ borderBottom: '1px solid #434343', marginBottom: '8px', paddingBottom: '4px', color: '#8c8c8c' }}>
+          Локация: {data.location}
+        </div>
+      )}
+      <div style={{ marginBottom: '4px', fontWeight: 'bold' }}>Оснащение:</div>
+      {data?.equipment?.length > 0 ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+          {data.equipment.map((item, i) => (
+            <Tag key={i} color="gold" style={{ fontSize: '10px', margin: 0 }}>
+              {item}
+            </Tag>
+          ))}
+        </div>
+      ) : (
+        <div style={{ color: '#595959' }}>{data?.description || 'Нет описания'}</div>
+      )}
+    </div>
+  );
+
+  return (
+    <Tooltip 
+      title={content} 
+      color="#1f1f1f"
+      onOpenChange={(open) => { if (open && !data) refetch(); }}
+    >
+      <InfoCircleOutlined style={{ color: '#52c41a', cursor: 'help' }} />
+    </Tooltip>
+  );
+};
 
 const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId, mainPlaceId }) => {
   const columns = [
@@ -70,6 +116,11 @@ const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId, mainPlac
       key: 'description',
       render: (text, record) => {
         const isMeeting = record.name?.startsWith('П');
+        // Проверяем оборудование на наличие монитора
+        const hasMonitor = record.equipment?.some(e => e.toLowerCase().includes('монитор'));
+        // Проверяем описание на наличие окна
+        const hasWindow = record.description?.toLowerCase().includes('окно');
+
         return (
           <Space direction="vertical" size={0}>
             <Text style={{ 
@@ -80,11 +131,16 @@ const PlacesTable = ({ data, onBook, onToggleFavorite, favoritePlaceId, mainPlac
             }}>
               {isMeeting ? 'Переговорная' : 'Рабочее место'}
             </Text>
+            
+            {/* Выводим реальный текст из API */}
             {text && <Text style={{ color: '#595959', fontSize: '11px' }}>{text}</Text>}
+            
             <Space style={{ fontSize: '16px', marginTop: '4px' }}>
-               {record.equipment?.some(e => e.toLowerCase().includes('монитор')) && <DesktopOutlined style={{ color: '#1677ff' }} />}
-               {record.description?.toLowerCase().includes('окно') && <CloudOutlined style={{ color: '#8c8c8c' }} />}
-               <Tooltip title="Розетки 220V"><InfoCircleOutlined style={{ color: '#52c41a', fontSize: '12px' }} /></Tooltip>
+               {hasMonitor && <DesktopOutlined style={{ color: '#1677ff' }} />}
+               {hasWindow && <CloudOutlined style={{ color: '#8c8c8c' }} />}
+               
+               {/* ЗАМЕНА: Реальные данные вместо мока "Розетки" */}
+               <EquipmentTooltip workspaceId={record.id} />
             </Space>
           </Space>
         );

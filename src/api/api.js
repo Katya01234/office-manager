@@ -89,6 +89,12 @@ checkAvailability: async (id, start, end) => {
         }
     });
     return response.data; // { available: boolean, ... }
-}
+},
+
+getWorkspaceDetails: async (id) => {
+  const response = await api.get(`/workspaces/${id}`);
+  return response.data;
+},
+
 
 };
