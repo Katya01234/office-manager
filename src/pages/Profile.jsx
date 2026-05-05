@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Typography, Card, Space, Input, Button, Tag, Avatar, message, Spin } from 'antd';
 import { 
   UserOutlined, EditOutlined, SaveOutlined, 
-  LogoutOutlined, TeamOutlined, CheckCircleFilled, MessageOutlined 
+  LogoutOutlined, TeamOutlined, CheckCircleFilled, MessageOutlined, RocketOutlined 
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
@@ -51,6 +51,17 @@ const Profile = () => {
       
       <Card
         style={{ background: '#141414', borderColor: '#333', borderRadius: '16px' }}
+        extra={
+      <Button 
+        type="text" 
+        icon={<RocketOutlined style={{ fontSize: '20px', color: '#fadb14' }} />} 
+        onClick={() => navigate('/roadmap')}
+        style={{ opacity: 0.6, transition: 'opacity 0.3s' }}
+        onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+        onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
+        title="Посмотреть планы развития"
+      />
+    }
         actions={[
           isEditing ? (
             <Button type="primary" icon={<SaveOutlined />} onClick={() => setIsEditing(false)} style={{ background: '#fadb14', color: '#000', border: 'none' }}>

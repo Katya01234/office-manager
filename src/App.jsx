@@ -9,6 +9,7 @@ import Profile from './pages/Profile.jsx';
 import Friends from './pages/Friends.jsx';
 // ИМПОРТИРУЕМ НОВУЮ СТРАНИЦУ
 import OfficeMapPage from './pages/Map/index.jsx'; 
+import Roadmap from './pages/Roadmap.jsx';
 
 import { themeConfig, customColors } from './styles/theme';
 
@@ -71,6 +72,10 @@ const App = () => {
                 path="/profile" 
                 element={isAuthenticated ? <Profile /> : <Navigate to="/login" replace />} 
               />
+              <Route 
+          path="/roadmap" 
+          element={isAuthenticated ? <Roadmap /> : <Navigate to="/login" replace />} 
+        />
               <Route 
                 path="/friends" 
                 element={isAuthenticated ? <Friends /> : <Navigate to="/login" replace />} 

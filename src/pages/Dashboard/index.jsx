@@ -165,39 +165,6 @@ const Dashboard = () => {
                 />
               )}
 
-              {/* 2. Блок "Будущее развитие": AI Capabilities */}
-              <Card 
-                bordered={false}
-                style={{ 
-                  background: 'linear-gradient(145deg, #141414 0%, #1f1f1f 100%)', 
-                  borderRadius: '12px',
-                  border: '1px solid #303030'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <Title level={5} style={{ color: '#fff', margin: 0, fontSize: '15px' }}>Roadmap: AI & Auto</Title>
-                  <Badge count="Future" style={{ backgroundColor: '#722ed1', fontSize: '10px' }} />
-                </div>
-                
-                <Space direction="vertical" size="middle">
-                  <div>
-                    <Text style={{ color: '#d4af37', fontSize: '13px', fontWeight: 600 }}>🤖 Интеграция с LLM</Text>
-                    <br />
-                    <Text style={{ color: '#8c8c8c', fontSize: '12px' }}>
-                      Управление бронированием через чат-бота VK: просто напишите "Продли на 2 часа" или "Найди свободную переговорку".
-                    </Text>
-                  </div>
-
-                  <div style={{ borderTop: '1px solid #303030', paddingTop: '12px' }}>
-                    <Text style={{ color: '#d4af37', fontSize: '13px', fontWeight: 600 }}>📅 Умная автобронь</Text>
-                    <br />
-                    <Text style={{ color: '#8c8c8c', fontSize: '12px' }}>
-                      Система автоматически забронирует ваше любимое место по расписанию, учитывая загруженность офиса.
-                    </Text>
-                  </div>
-                </Space>
-              </Card>
-
               {/* 3. История бронирований */}
               <HistorySidebar 
                 history={data.userStats.history} 
