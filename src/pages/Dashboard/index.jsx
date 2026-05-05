@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Row, Col, message, Spin, Layout } from 'antd';
+import { Row, Col, message, Spin, Layout, Card, Typography, Space, Badge } from 'antd'; // Добавили компоненты для AI Card
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc'; 
@@ -10,10 +10,12 @@ import PlacesFilters from "./components/PlacesFilters.jsx";
 import PlacesTable from "./components/PlacesTable.jsx";
 import BookingModal from "./components/BookingModal";
 import HistorySidebar from "./components/HistorySidebar.jsx";
+import VKWidget from "./components/VKWidget"; // Импорт виджета VK
 
 dayjs.extend(utc);
 
 const { Content } = Layout;
+const { Text, Title } = Typography;
 
 const Dashboard = () => {
   const queryClient = useQueryClient();
@@ -39,7 +41,6 @@ const Dashboard = () => {
         workspaceApi.getVkStatus()
       ]);
 
-      // Убираем дубликаты сразу при получении данных
       const rawHistory = [...(active || []), ...(hist || [])];
       const uniqueHistory = Array.from(new Map(rawHistory.map(item => [item.id, item])).values());
 
@@ -153,11 +154,56 @@ const Dashboard = () => {
               }}
             />
           </Col>
+          
           <Col xs={24} lg={8}>
-            <HistorySidebar 
-              history={data.userStats.history} 
-              onCancelBooking={(id) => workspaceApi.deleteBooking(id).then(() => queryClient.invalidateQueries(['dashboardData']))} 
-            />
+            <Space direction="vertical" size="large" style={{ width: '100%' }}>
+              
+              {/* 1. Виджет привязки VK (отображается, если не привязан) */}
+              {data.userStats.vkStatus && !data.userStats.vkStatus.is_linked && (
+                <VKWidget 
+                  onConnectSuccess={() => queryClient.invalidateQueries({ queryKey: ['dashboardData'] })} 
+                />
+              )}
+
+              {/* 2. Блок "Будущее развитие": AI Capabilities */}
+              <Card 
+                bordered={false}
+                style={{ 
+                  background: 'linear-gradient(145deg, #141414 0%, #1f1f1f 100%)', 
+                  borderRadius: '12px',
+                  border: '1px solid #303030'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <Title level={5} style={{ color: '#fff', margin: 0, fontSize: '15px' }}>Roadmap: AI & Auto</Title>
+                  <Badge count="Future" style={{ backgroundColor: '#722ed1', fontSize: '10px' }} />
+                </div>
+                
+                <Space direction="vertical" size="middle">
+                  <div>
+                    <Text style={{ color: '#d4af37', fontSize: '13px', fontWeight: 600 }}>🤖 Интеграция с LLM</Text>
+                    <br />
+                    <Text style={{ color: '#8c8c8c', fontSize: '12px' }}>
+                      Управление бронированием через чат-бота VK: просто напишите "Продли на 2 часа" или "Найди свободную переговорку".
+                    </Text>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #303030', paddingTop: '12px' }}>
+                    <Text style={{ color: '#d4af37', fontSize: '13px', fontWeight: 600 }}>📅 Умная автобронь</Text>
+                    <br />
+                    <Text style={{ color: '#8c8c8c', fontSize: '12px' }}>
+                      Система автоматически забронирует ваше любимое место по расписанию, учитывая загруженность офиса.
+                    </Text>
+                  </div>
+                </Space>
+              </Card>
+
+              {/* 3. История бронирований */}
+              <HistorySidebar 
+                history={data.userStats.history} 
+                onCancelBooking={(id) => workspaceApi.deleteBooking(id).then(() => queryClient.invalidateQueries(['dashboardData']))} 
+              />
+            </Space>
           </Col>
         </Row>
 
@@ -169,7 +215,6 @@ const Dashboard = () => {
             initialDate={filters.date}
             onCancel={() => setIsModalOpen(false)}
             onConfirm={(vals) => {
-              // ИСПОЛЬЗУЕМ UTC ПРИ ОТПРАВКЕ
               createMutation.mutate({
                 workspace_id: selectedPlace.id,
                 start_datetime: dayjs(vals.start).utc().format(),
