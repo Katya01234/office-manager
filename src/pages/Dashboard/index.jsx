@@ -17,6 +17,8 @@ dayjs.extend(utc);
 const { Content } = Layout;
 const { Text, Title } = Typography;
 
+// ... (импорты остаются прежними)
+
 const Dashboard = () => {
   const queryClient = useQueryClient();
   const [selectedPlace, setSelectedPlace] = useState(null);
@@ -29,36 +31,62 @@ const Dashboard = () => {
     type: 'all' 
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['dashboardData'],
-    queryFn: async () => {
-      const [ws, active, fav, hist, main, vkStatus] = await Promise.all([
-        workspaceApi.getWorkspaces(),
-        workspaceApi.getBookings(),
-        workspaceApi.getFavorite(),
-        workspaceApi.getBookingHistory(),
-        workspaceApi.getMainWorkspace(),
-        workspaceApi.getVkStatus()
-      ]);
+const { data, isLoading, isFetching } = useQuery({
+  queryKey: ['dashboardData', filters.date.format('YYYY-MM-DD'), filters.timeRange],
+  queryFn: async () => {
+    let workspacesPromise;
 
-      const rawHistory = [...(active || []), ...(hist || [])];
-      const uniqueHistory = Array.from(new Map(rawHistory.map(item => [item.id, item])).values());
+    if (filters.timeRange && filters.timeRange[0] && filters.timeRange[1]) {
+      const [startTime, endTime] = filters.timeRange; // Деструктуризация для удобства
 
-      return {
-        places: (ws || []).map(p => ({ 
-          ...p, 
-          key: p.id, 
-          activeBookings: (active || []).filter(b => b.workspace_id === p.id) 
-        })),
-        userStats: {
-          history: uniqueHistory,
-          favoritePlace: fav,
-          mainPlace: main,
-          vkStatus: vkStatus
-        }
-      };
+      const startIso = filters.date
+        .hour(startTime.hour())
+        .minute(startTime.minute())
+        .second(0)
+        .utc()
+        .format();
+
+      const endIso = filters.date
+        .hour(endTime.hour())
+        .minute(endTime.minute())
+        .second(0)
+        .utc()
+        .format();
+
+      workspacesPromise = workspaceApi.getAvailableWorkspaces(startIso, endIso);
+    } else {
+      workspacesPromise = workspaceApi.getWorkspaces();
     }
-  });
+
+    const [ws, active, fav, hist, main, vkStatus] = await Promise.all([
+      workspacesPromise,
+      workspaceApi.getBookings(),
+      workspaceApi.getFavorite(),
+      workspaceApi.getBookingHistory(),
+      workspaceApi.getMainWorkspace(),
+      workspaceApi.getVkStatus()
+    ]);
+
+    const rawHistory = [...(active || []), ...(hist || [])];
+    const uniqueHistory = Array.from(new Map(rawHistory.map(item => [item.id, item])).values());
+
+    return {
+      places: (ws || []).map(p => ({ 
+        ...p, 
+        key: p.id,
+        activeBookings: (active || []).filter(b => b.workspace_id === p.id) 
+      })),
+      userStats: {
+        history: uniqueHistory,
+        favoritePlace: fav,
+        mainPlace: main,
+        vkStatus: vkStatus
+      }
+    };
+  },
+  placeholderData: (previousData) => previousData,
+});
+
 
   const createMutation = useMutation({
     mutationFn: workspaceApi.createBooking,
@@ -143,17 +171,19 @@ const Dashboard = () => {
         
         <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
           <Col xs={24} lg={16}>
-            <PlacesTable 
-              data={filteredPlaces} 
-              onBook={(p) => { setSelectedPlace(p); setIsModalOpen(true); }}
-              favoritePlaceId={data.userStats.favoritePlace?.id} 
-              mainPlaceId={data.userStats.mainPlace?.id}
-              onToggleFavorite={async (id) => { 
-                await workspaceApi.toggleFavorite(id); 
-                queryClient.invalidateQueries({ queryKey: ['dashboardData'] }); 
-              }}
-            />
-          </Col>
+            <Spin spinning={isFetching && !isLoading}> 
+              <PlacesTable 
+                data={filteredPlaces} 
+                onBook={(p) => { setSelectedPlace(p); setIsModalOpen(true); }}
+                favoritePlaceId={data.userStats.favoritePlace?.id} 
+                mainPlaceId={data.userStats.mainPlace?.id}
+                onToggleFavorite={async (id) => { 
+                  await workspaceApi.toggleFavorite(id); 
+                  queryClient.invalidateQueries({ queryKey: ['dashboardData'] }); 
+                }}
+              />
+            </Spin>
+            </Col>
           
           <Col xs={24} lg={8}>
             <Space direction="vertical" size="large" style={{ width: '100%' }}>

@@ -96,5 +96,15 @@ getWorkspaceDetails: async (id) => {
   return response.data;
 },
 
+getAvailableWorkspaces: async (start, end) => {
+    const response = await api.get(`/workspaces/available`, {
+      params: {
+        start: start,
+        end: end
+      }
+    });
+    return response.data;
+  },
+
 
 };
