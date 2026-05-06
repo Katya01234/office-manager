@@ -100,16 +100,16 @@ const BookingModal = ({ open, onCancel, onConfirm, place, initialDate, initialTi
               ✉️ Привяжите VK в профиле для уведомлений.
             </Text>
           </div>
-        ) : 
+        ) :   
         // 2. Если привязан, но сообщения НЕ разрешены
-        (!vkStatus.message_allowed) ? (
-          <div style={{ background: 'rgba(0, 119, 255, 0.05)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(0, 119, 255, 0.2)' }}>
-            <Text style={{ color: '#40a9ff', fontSize: '12px', display: 'block' }}>
-              ✉️ Разрешите сообщения для подтверждения бронирования.
-            </Text>
-            <VKAllowMessages key={open ? 'active' : 'hidden'} />
-          </div>
-        ) : 
+        // (!vkStatus.message_allowed) ? (
+        //   <div style={{ background: 'rgba(0, 119, 255, 0.05)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(0, 119, 255, 0.2)' }}>
+        //     <Text style={{ color: '#40a9ff', fontSize: '12px', display: 'block' }}>
+        //       ✉️ Разрешите сообщения для подтверждения бронирования.
+        //     </Text>
+        //     <VKAllowMessages key={open ? 'active' : 'hidden'} />
+        //   </div>
+        // ) : 
         // 3. Если всё привязано и разрешено — возвращаем null (ничего не рендерим)
         null
       )}

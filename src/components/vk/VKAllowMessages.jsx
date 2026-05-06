@@ -8,7 +8,6 @@ const VKAllowMessages = () => {
     if (window.VK && window.VK.Widgets && containerRef.current) {
       // Очищаем содержимое контейнера перед инициализацией
       containerRef.current.innerHTML = ''; 
-
       // Передаем сам DOM-элемент вместо строкового ID
       window.VK.Widgets.AllowMessagesFromCommunity(
         containerRef.current, 
