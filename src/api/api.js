@@ -106,5 +106,14 @@ getAvailableWorkspaces: async (start, end) => {
     return response.data;
   },
 
+  rescheduleBooking: async (id, startDatetime, endDatetime) => {
+    const response = await api.patch(`/bookings/${id}`, {
+      params: {
+        start_datetime: startDatetime,
+        end_datetime: endDatetime,
+    }
+    });
+    return response.data;
+  },
 
 };

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Card, Typography, Tag, Empty, Space, Button } from 'antd';
+import { Card, Typography, Empty, Space, Button } from 'antd';
 import { 
   HistoryOutlined, 
   CalendarOutlined, 
@@ -16,7 +16,7 @@ dayjs.locale('ru');
 
 const { Text } = Typography;
 
-const HistorySidebar = ({ history, onCancelBooking }) => {
+const HistorySidebar = ({ history, onCancelBooking, onReschedule }) => {
   const { activeBookings, pastHistory } = useMemo(() => {
     const all = history || [];
     const now = dayjs();
@@ -34,6 +34,7 @@ const HistorySidebar = ({ history, onCancelBooking }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
+      {/* ПРЕДСТОЯЩИЕ СЕССИИ */}
       <Card 
         title={<span style={{ color: '#fadb14' }}><RocketOutlined /> Предстоящие сессии</span>}
         style={{ background: '#141414', borderColor: '#333', borderRadius: '12px' }}
@@ -41,22 +42,50 @@ const HistorySidebar = ({ history, onCancelBooking }) => {
       >
         {activeBookings.length > 0 ? (
           activeBookings.map(item => (
-            <div key={item.id} style={{ padding: '12px', marginBottom: 12, background: '#1f1f1f', borderRadius: '8px', border: '1px solid #333' }}>
+            <div 
+              key={item.id} 
+              onClick={() => onReschedule(item)}
+              style={{ 
+                padding: '12px', 
+                marginBottom: 12, 
+                background: '#1f1f1f', 
+                borderRadius: '8px', 
+                border: '1px solid #333',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              // Эффект наведения в стиле тихой роскоши
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#D4AF37';
+                e.currentTarget.style.boxShadow = '0 0 10px rgba(212, 175, 55, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#333';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text strong style={{ color: '#fff' }}>{item.workspace_name || `Место #${item.workspace_id}`}</Text>
                 <Button 
                   type="text" 
                   danger 
                   icon={<DeleteOutlined />} 
-                  onClick={() => onCancelBooking(item.id)}
+                  onClick={(e) => {
+                    e.stopPropagation(); // Остановка всплытия, чтобы не сработал onClick родителя (onReschedule)
+                    onCancelBooking(item.id);
+                  }}
                   style={{ height: 'auto', padding: '4px' }}
                 />
               </div>
               <div style={{ marginTop: 4 }}>
                 <Text type="secondary" style={{ fontSize: '12px' }}>
-                  {/* ИСПРАВЛЕНО: Форматирование интервала */}
                   <CalendarOutlined /> {dayjs.utc(item.start_datetime).local().format('DD.MM')} | {dayjs.utc(item.start_datetime).local().format('HH:mm')} - {dayjs.utc(item.end_datetime).local().format('HH:mm')}
                 </Text>
+              </div>
+              <div style={{ marginTop: 4 }}>
+                 <Text style={{ color: '#D4AF37', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                   Нажмите, чтобы перенести
+                 </Text>
               </div>
             </div>
           ))
@@ -65,6 +94,7 @@ const HistorySidebar = ({ history, onCancelBooking }) => {
         )}
       </Card>
 
+      {/* ИСТОРИЯ ПОСЕЩЕНИЙ */}
       <Card 
         title={<span style={{ color: '#fff' }}><HistoryOutlined /> История посещений</span>} 
         style={{ background: '#141414', borderColor: '#333', borderRadius: '12px' }}
@@ -82,7 +112,6 @@ const HistorySidebar = ({ history, onCancelBooking }) => {
                   <CalendarOutlined /> {dayjs.utc(item.start_datetime).local().format('D MMMM YYYY')}
                 </Text>
                 <Text style={{ fontSize: '11px', color: '#595959' }}>
-                  {/* ИСПРАВЛЕНО: Конец интервала b.end_datetime */}
                   <ClockCircleOutlined style={{ fontSize: '10px' }} /> {dayjs.utc(item.start_datetime).local().format('HH:mm')} — {dayjs.utc(item.end_datetime).local().format('HH:mm')}
                 </Text>
               </Space>

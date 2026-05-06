@@ -11,7 +11,6 @@ const PlacesFilters = ({ filters, setFilters }) => {
   const hasChanges = useMemo(() => {
     const isNotTomorrow = filters.date ? !filters.date.isSame(tomorrow, 'day') : false;
     const hasTimeSelected = filters.timeRange !== null;
-    // Добавляем проверку на фильтр типа (если выбран не 'all')
     const hasTypeFilter = filters.type && filters.type !== 'all';
     return isNotTomorrow || hasTimeSelected || hasTypeFilter;
   }, [filters.date, filters.timeRange, filters.type, tomorrow]);
@@ -21,7 +20,7 @@ const PlacesFilters = ({ filters, setFilters }) => {
       ...prev,
       date: tomorrow,
       timeRange: null,
-      type: 'all' // Сброс типа
+      type: 'all'
     }));
   };
 
@@ -36,7 +35,6 @@ const PlacesFilters = ({ filters, setFilters }) => {
       bodyStyle={{ padding: '12px 24px' }}
     >
       <Space size="large" wrap>
-        {/* НОВЫЙ ФИЛЬТР ТИПА */}
         <Space direction="vertical" size={0}>
           <Text style={{ color: '#595959', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Тип зоны</Text>
           <Radio.Group 
@@ -77,6 +75,8 @@ const PlacesFilters = ({ filters, setFilters }) => {
             value={filters.timeRange}
             format="HH:mm"
             minuteStep={15}
+            // ГЛАВНОЕ ИЗМЕНЕНИЕ ТУТ:
+            needConfirm={false} 
             onChange={(range) => setFilters(prev => ({ ...prev, timeRange: range }))}
             style={{ width: 180 }}
             suffixIcon={<ClockCircleOutlined />}
@@ -90,7 +90,7 @@ const PlacesFilters = ({ filters, setFilters }) => {
             icon={<CloseCircleOutlined />}
             onClick={handleReset}
             style={{ 
-              marginTop: '18px', // Выравнивание с инпутами
+              marginTop: '18px', 
               fontWeight: '500' 
             }}
           >
@@ -100,7 +100,6 @@ const PlacesFilters = ({ filters, setFilters }) => {
       </Space>
 
       <style jsx="true">{`
-        /* Стили для того, чтобы RadioButtons вписались в темную тему */
         .ant-radio-button-wrapper {
           background: #1d1d1d !important;
           border-color: #333 !important;
@@ -113,6 +112,10 @@ const PlacesFilters = ({ filters, setFilters }) => {
         }
         .ant-radio-button-wrapper:hover {
           color: #fadb14 !important;
+        }
+        /* Убираем футер с кнопкой OK, если он остался пустым */
+        .ant-picker-footer {
+          display: none !important;
         }
       `}</style>
     </Card>
