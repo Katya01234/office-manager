@@ -142,7 +142,7 @@ const Login = () => {
             <Text style={{ color: '#8c8c8c', display: 'block', marginBottom: 4 }}>Внутренний номер:</Text>
             <Title level={4} style={{ color: '#fff', margin: 0 }}>
               <PhoneOutlined style={{ color: '#fadb14', marginRight: 8 }} /> 
-               +7 (900) 000-00-00
+               +7 (900) 000-11-77
             </Title>
           </div>
 
@@ -151,7 +151,7 @@ const Login = () => {
             <Space>
               <Button 
                 icon={<SendOutlined />} 
-                href="https://t.me/your_company_it" 
+                href="https://t.me/rikkiter" 
                 target="_blank"
                 style={{ background: '#0088cc', color: '#fff', border: 'none' }}
               >
@@ -165,7 +165,7 @@ const Login = () => {
                   </svg>
                 </span>
               }
-              href="https://vk.com/your_community" 
+              href="https://vk.com/club237429206" 
               target="_blank"
               style={{ 
                 background: '#0077FF', 

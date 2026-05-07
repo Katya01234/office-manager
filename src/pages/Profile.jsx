@@ -16,6 +16,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [userData, setUserData] = useState(null); 
+  const [vkStatus, setVkStatus] = useState({ is_linked: false, message_allowed: false });
   
   const navigate = useNavigate();
 
@@ -29,6 +30,12 @@ const Profile = () => {
           team: data?.team || 'Без команды',
           vk_id: data?.vk_id || null
         });
+
+        // Если VK привязан, сразу проверяем статус сообщений
+        if (data?.vk_id) {
+          const status = await workspaceApi.getVkStatus();
+          setVkStatus(status);
+        }
       } catch (err) {
         if (err.response?.status === 401) {
           navigate('/login');
@@ -52,16 +59,16 @@ const Profile = () => {
       <Card
         style={{ background: '#141414', borderColor: '#333', borderRadius: '16px' }}
         extra={
-      <Button 
-        type="text" 
-        icon={<RocketOutlined style={{ fontSize: '20px', color: '#fadb14' }} />} 
-        onClick={() => navigate('/roadmap')}
-        style={{ opacity: 0.6, transition: 'opacity 0.3s' }}
-        onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
-        onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
-        title="Посмотреть планы развития"
-      />
-    }
+          <Button 
+            type="text" 
+            icon={<RocketOutlined style={{ fontSize: '20px', color: '#fadb14' }} />} 
+            onClick={() => navigate('/roadmap')}
+            style={{ opacity: 0.6, transition: 'opacity 0.3s' }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
+            title="Посмотреть планы развития"
+          />
+        }
         actions={[
           isEditing ? (
             <Button type="primary" icon={<SaveOutlined />} onClick={() => setIsEditing(false)} style={{ background: '#fadb14', color: '#000', border: 'none' }}>
@@ -98,21 +105,39 @@ const Profile = () => {
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text style={{ color: '#fff' }}><MessageOutlined /> Уведомления VK</Text>
-                  <Tag color="success" icon={<CheckCircleFilled />}>Привязано</Tag>
+                  <Tag color={vkStatus.message_allowed ? "success" : "processing"} icon={<CheckCircleFilled />}>
+                    {vkStatus.message_allowed ? "Включены" : "Привязано"}
+                  </Tag>
                 </div>
-                <VKAllowMessages />
+                
+                {/* Виджет показываем только если сообщения еще не разрешены */}
+                {!vkStatus.message_allowed ? (
+                  <VKAllowMessages />
+                ) : (
+                  <div style={{ textAlign: 'center', marginTop: 8 }}>
+                    <Text style={{ color: '#8c8c8c', fontSize: '12px' }}>
+                      Вы будете получать уведомления о бронированиях в личные сообщения.
+                    </Text>
+                  </div>
+                )}
               </Space>
             </div>
           )}
 
           <div style={{ textAlign: 'left' }}>
             <Text type="secondary">Команда</Text>
-            <div style={{ marginTop: 8 }}><Text style={{ color: '#fadb14', fontSize: '16px' }}><TeamOutlined /> {userData.team}</Text></div>
+            <div style={{ marginTop: 8 }}>
+              <Text style={{ color: '#fadb14', fontSize: '16px' }}>
+                <TeamOutlined /> {userData.team}
+              </Text>
+            </div>
           </div>
 
           <div style={{ textAlign: 'left' }}>
             <Text type="secondary">Роль</Text>
-            <div style={{ marginTop: 8 }}><Tag color="gold">{ROLE_LABELS[userData.role] || userData.role}</Tag></div>
+            <div style={{ marginTop: 8 }}>
+              <Tag color="gold">{ROLE_LABELS[userData.role] || userData.role}</Tag>
+            </div>
           </div>
         </Space>
       </Card>

@@ -30,21 +30,19 @@ const VKWidget = ({ onConnectSuccess }) => {
         })
         .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, async (payload) => {
           try {
-            // Обмениваем код на токены через SDK
             const result = await VKID.Auth.exchangeCode(payload.code, payload.device_id);
-            
-            // ОТПРАВЛЯЕМ token_id на бэкенд (ручка POST me/vk)
-            // Обычно это id_token или access_token из результата exchangeCode
-            await workspaceApi.connectVk(result.id_token || result.access_token);
-            
+            const vkUserId = result.user?.id || result.user_id;
+
+            if (!vkUserId) {
+              throw new Error("Не удалось получить VK ID из ответа SDK");
+            }
+            await workspaceApi.connectVk(String(vkUserId));
             message.success("ВК успешно привязан к аккаунту!");
-            
-            // Коллбэк обновит данные в Dashboard и скроет виджет
             if (onConnectSuccess) {
               onConnectSuccess();
             }
           } catch (err) {
-            console.error(err);
+            console.error("VK Link Error:", err);
             message.error("Ошибка привязки аккаунта ВК");
           }
         });

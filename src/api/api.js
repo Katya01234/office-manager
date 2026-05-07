@@ -2,10 +2,10 @@ import api from './index';
 
 export const workspaceApi = {
 
-  connectVk: async (tokenId) => {
-    const response = await api.post('/me/vk', { token_id: tokenId }); 
-    return response.data;
-  },
+  connectVk: async (vkId) => {
+  const response = await api.post('/me/vk', { vk_id: String(vkId) }); 
+  return response.data;
+},
 
   login: async (login, password) => {
     const response = await api.post('/auth/sign-in', { login, password });
@@ -106,14 +106,22 @@ getAvailableWorkspaces: async (start, end) => {
     return response.data;
   },
 
+  // rescheduleBooking: async (id, startDatetime, endDatetime) => {
+  //   const response = await api.patch(`/bookings/${id}`, {
+  //     params: {
+  //       start_datetime: startDatetime,
+  //       end_datetime: endDatetime,
+  //   }
+  //   });
+  //   return response.data;
+  // },
+
   rescheduleBooking: async (id, startDatetime, endDatetime) => {
-    const response = await api.patch(`/bookings/${id}`, {
-      params: {
-        start_datetime: startDatetime,
-        end_datetime: endDatetime,
-    }
-    });
-    return response.data;
-  },
+  const response = await api.patch(`/bookings/${id}`, {
+    start_datetime: startDatetime,
+    end_datetime: endDatetime
+  });
+  return response.data;
+},
 
 };

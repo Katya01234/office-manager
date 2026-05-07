@@ -1,23 +1,37 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 
 const VKAllowMessages = () => {
-  const containerRef = useRef(null);
+  const widgetId = "vk_allow_messages_community";
 
   useEffect(() => {
-    // Проверяем наличие глобального объекта VK и ссылки на контейнер
-    if (window.VK && window.VK.Widgets && containerRef.current) {
-      // Очищаем содержимое контейнера перед инициализацией
-      containerRef.current.innerHTML = ''; 
-      // Передаем сам DOM-элемент вместо строкового ID
-      window.VK.Widgets.AllowMessagesFromCommunity(
-        containerRef.current, 
-        { height: 30 }, 
-        237429206
-      );
-    }
+    const initWidget = () => {
+      if (window.VK && window.VK.Widgets) {
+        const container = document.getElementById(widgetId);
+        if (container) {
+          container.innerHTML = ''; 
+          window.VK.Widgets.AllowMessagesFromCommunity(
+            widgetId, 
+            { height: 30 }, 
+            237429206
+          );
+        }
+      }
+    };
+    const timer = setTimeout(initWidget, 100);
+    return () => clearTimeout(timer);
   }, []);
 
-  return <div ref={containerRef} style={{ marginTop: 10 }} />;
+  return (
+    <div 
+      id={widgetId} 
+      style={{ 
+        marginTop: 10, 
+        display: 'flex', 
+        justifyContent: 'center',
+        minHeight: '30px'
+      }} 
+    />
+  );
 };
 
 export default VKAllowMessages;
